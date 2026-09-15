@@ -1,0 +1,35 @@
+{
+  "extends": "@electron-toolkit/tsconfig/tsconfig.web.json",
+  "include": [
+    "src/renderer/src/vite-env.d.ts",
+    "src/renderer/src/**/*",
+    "src/renderer/src/**/*.vue",
+    "src/common/**/*.ts",
+    "src/preload/*.d.ts",
+    "src/renderer/auto-imports.d.ts",
+    "src/renderer/components.d.ts"
+  ],
+  "compilerOptions": {
+    "composite": true,
+    "baseUrl": ".",
+    "jsxImportSource": "vue",
+    "moduleResolution": "bundler",
+    "target": "ESNext",
+    "module": "ESNext",
+    "useDefineForClassFields": true,
+    "strict": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "paths": {
+      "@/*": [
+        "src/renderer/src/*"
+      ],
+      "@common/*": [
+        "src/common/*"
+      ]
+    }
+  }
+}
