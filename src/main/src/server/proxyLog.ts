@@ -1,6 +1,6 @@
 import type { IncomingHttpHeaders } from 'node:http'
 import { recordLog } from '$/db/repo/logRepo'
-import { addUsage } from '$/db/repo/usageRepo'
+import { accumulateUsage } from '$/db/repo/usageRepo'
 import { refreshTrayUsage } from '$/app/tray'
 
 /** token 用量（透传路径从响应提取，转换路径来自 ai-sdk 统一 usage；均为提供商上报值） */
@@ -34,8 +34,15 @@ export interface ProxyLogEntry {
   resHeaders: string | null
 }
 
-/** 请求日志落库（失败不影响代理服务）。提供商未上报用量时基于请求正文估算，计入 unrecognizedTokens */
-export function recordLocalLog(entry: ProxyLogEntry): void {
+/**
+ * 请求落库（失败不影响代理服务）：同一次调用同时写入详细日志与用量聚合表。
+ *
+ * - 详细日志：request_logs，保留 7 天，供日志页排查。
+ * - 用量聚合：usage_daily / usage_hourly，永久 + 7 天，供统计看板；成功与失败都会计入请求数，
+ *   token 只在成功请求时累加（失败请求 usage 为 null，本地拦截的估算值也不应污染 token 统计）。
+ * - 提供商未上报用量时基于请求正文估算，计入 unrecognizedTokens（估算只做一次，两处共用）。
+ */
+export function recordRequest(entry: ProxyLogEntry): void {
   try {
     const finishedAt = Date.now()
     const usage = entry.usage
@@ -48,6 +55,9 @@ export function recordLocalLog(entry: ProxyLogEntry): void {
       : 0
     const hasUsage = reported > 0 || (usage?.totalTokens ?? 0) > 0
     const estimated = hasUsage ? 0 : estimateTokens(entry.reqBody)
+    const ok = entry.status >= 200 && entry.status < 300
+    const durationMs = finishedAt - entry.startedAt
+
     recordLog({
       path: entry.path,
       requestId: entry.requestId,
@@ -57,7 +67,7 @@ export function recordLocalLog(entry: ProxyLogEntry): void {
       startedAt: entry.startedAt,
       finishedAt,
       status: entry.status,
-      durationMs: finishedAt - entry.startedAt,
+      durationMs,
       stream: entry.stream,
       promptTokens: usage?.promptTokens ?? 0,
       completionTokens: usage?.completionTokens ?? 0,
@@ -72,23 +82,24 @@ export function recordLocalLog(entry: ProxyLogEntry): void {
       responseHeaders: entry.resHeaders,
       error: entry.error
     })
-  } catch {
-    // 日志落库失败不影响代理服务
-  }
-}
 
-/** 用量落库并刷新托盘（失败不影响代理服务） */
-export function addUsageQuietly(publicModel: string, usage: TokenUsage | null): void {
-  try {
-    addUsage({
-      publicModel,
+    accumulateUsage({
+      providerName: entry.providerName,
+      publicModel: entry.publicModel,
+      status: entry.status,
+      durationMs,
       promptTokens: usage?.promptTokens ?? 0,
       completionTokens: usage?.completionTokens ?? 0,
-      totalTokens: usage?.totalTokens ?? 0
+      reasoningTokens: usage?.reasoningTokens ?? 0,
+      cacheReadTokens: usage?.cacheReadTokens ?? 0,
+      cacheWriteTokens: usage?.cacheWriteTokens ?? 0,
+      totalTokens: hasUsage ? (usage?.totalTokens ?? 0) : estimated,
+      unrecognizedTokens: estimated
     })
-    refreshTrayUsage()
+
+    if (ok) refreshTrayUsage()
   } catch {
-    // 用量落库失败不影响代理服务
+    // 落库失败不影响代理服务
   }
 }
 

@@ -7,6 +7,7 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    EChart: typeof import('./src/components/EChart/EChart.vue')['default']
     PageLayout: typeof import('./src/components/PageLayout/PageLayout.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
@@ -39,5 +40,11 @@ declare module 'vue' {
     TTabs: typeof import('tdesign-vue-next')['Tabs']
     TTag: typeof import('tdesign-vue-next')['Tag']
     TTooltip: typeof import('tdesign-vue-next')['Tooltip']
+    UsageActivityCard: typeof import('./src/components/usage/UsageActivityCard.vue')['default']
+    UsageChartCard: typeof import('./src/components/usage/UsageChartCard.vue')['default']
+    UsageCompositionCard: typeof import('./src/components/usage/UsageCompositionCard.vue')['default']
+    UsageDashboard: typeof import('./src/components/usage/UsageDashboard.vue')['default']
+    UsageRatioCard: typeof import('./src/components/usage/UsageRatioCard.vue')['default']
+    UsageStatCard: typeof import('./src/components/usage/UsageStatCard.vue')['default']
   }
 }

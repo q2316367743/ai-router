@@ -12,7 +12,10 @@ import type {
   ServiceConfig,
   ServiceStatus,
   TodayStats,
-  UsageDailyItem
+  UsageDailyItem,
+  UsageFilterOptions,
+  UsageOverview,
+  UsageQuery
 } from '@common/types'
 
 declare global {
@@ -58,8 +61,20 @@ declare global {
         todayStats(): Promise<TodayStats>
       }
       usage: {
-        /** 查询日期区间（含边界）内按日 × 模型的用量明细 */
+        /** 看板全量统计数据（总计 / 供应商与模型拆分 / 时间序列 / 活跃度） */
+        overview(query: UsageQuery): Promise<UsageOverview>
+        /** 统计筛选项：聚合表中去重后的供应商与模型 */
+        filterOptions(): Promise<UsageFilterOptions>
+        /** 查询日期区间（含边界）内按日 × 供应商 × 模型的用量明细 */
         listByRange(startDate: string, endDate: string): Promise<UsageDailyItem[]>
+      }
+      tray: {
+        /** 收起托盘统计面板 */
+        hide(): Promise<void>
+        /** 打开（或前置）主窗口 */
+        openMain(): Promise<void>
+        /** 订阅面板显示事件（每次弹出触发，用于刷新过期数据），返回退订函数 */
+        onShown(cb: () => void): () => void
       }
     }
   }

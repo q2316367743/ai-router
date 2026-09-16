@@ -3,7 +3,7 @@ import express, { type Express, type NextFunction, type Request, type Response }
 import { listModelMappings } from '$/db/repo/modelRepo'
 import { getServiceConfig } from '$/db/repo/settingRepo'
 import { errMsg, sendJson, sendOpenAiError } from './httpRespond'
-import { recordLocalLog, serializeRequestHeaders } from './proxyLog'
+import { recordRequest, serializeRequestHeaders } from './proxyLog'
 import { forwardRequest } from './proxyHandler'
 
 /** 请求体上限：32MB，防异常大包拖垮内存 */
@@ -41,7 +41,7 @@ export function createProxyApp(): Express {
     }
     const startedAt = Date.now()
     const resBody = sendOpenAiError(res, 401, 'Invalid API key provided', 'invalid_api_key')
-    recordLocalLog({
+    recordRequest({
       path: req.originalUrl,
       requestId: randomUUID(),
       publicModel: '-',

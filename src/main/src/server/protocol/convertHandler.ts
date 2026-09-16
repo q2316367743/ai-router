@@ -3,7 +3,7 @@ import type { LanguageModelUsage } from 'ai'
 import type { ServerResponse } from 'node:http'
 import type { MappingRoute } from '$/db/repo/modelRepo'
 import { errMsg, sendOpenAiError } from '../httpRespond'
-import { addUsageQuietly, recordLocalLog, type TokenUsage } from '../proxyLog'
+import { recordRequest, type TokenUsage } from '../proxyLog'
 import { parseChatPrompt } from './chatRequest'
 import {
   createChunkWriter,
@@ -60,7 +60,7 @@ export async function forwardConverted(options: ForwardConvertedOptions): Promis
   // 日志 path 记上游实际请求路径（而非客户端入口路径）
   const logPath = upstreamPathOf(joinConvertUrl(route.providerBaseUrl, route.providerProtocol))
   const log = (outcome: ConvertOutcome): void => {
-    recordLocalLog({
+    recordRequest({
       path: logPath,
       requestId,
       publicModel,
@@ -76,7 +76,6 @@ export async function forwardConverted(options: ForwardConvertedOptions): Promis
       resBody: outcome.resBody,
       resHeaders: outcome.resHeaders
     })
-    if (outcome.ok) addUsageQuietly(publicModel, outcome.usage)
   }
 
   let prompt: ChatPrompt

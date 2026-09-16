@@ -1,10 +1,45 @@
 import { ipcMain } from 'electron'
-import { listUsageByRange } from '../db/repo/usageRepo'
+import type { UsageQuery, UsageRangeKey } from '@common/types'
+import { listUsageByRange, queryUsageFilterOptions, queryUsageOverview } from '../db/repo/usageRepo'
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+const RANGE_KEYS: ReadonlySet<string> = new Set<UsageRangeKey>([
+  'today',
+  'last24h',
+  'last7d',
+  'last30d'
+])
 
-/** 用量域 IPC：按日期区间（含边界）查询每日用量 */
+/** 筛选值白名单校验：null / 空串表示不筛选，其余必须是字符串 */
+function normalizeOptionalName(value: unknown, label: string): string | null {
+  if (value === null || value === undefined || value === '') return null
+  if (typeof value !== 'string') throw new Error(`${label}应为字符串`)
+  return value
+}
+
+/** 校验看板查询入参（范围枚举 + 可选筛选） */
+function normalizeUsageQuery(query: unknown): UsageQuery {
+  if (!query || typeof query !== 'object') throw new Error('查询参数缺失')
+  const raw = query as Record<string, unknown>
+  const range = raw['range']
+  if (typeof range !== 'string' || !RANGE_KEYS.has(range)) {
+    throw new Error('统计维度应为 today / last24h / last7d / last30d')
+  }
+  return {
+    range: range as UsageRangeKey,
+    providerName: normalizeOptionalName(raw['providerName'], '供应商'),
+    publicModel: normalizeOptionalName(raw['publicModel'], '模型')
+  }
+}
+
+/** 用量域 IPC：看板聚合数据与永久明细 */
 export function registerUsageIpc(): void {
+  ipcMain.handle('usage:overview', (_e, query: unknown) =>
+    queryUsageOverview(normalizeUsageQuery(query))
+  )
+
+  ipcMain.handle('usage:filterOptions', () => queryUsageFilterOptions())
+
   ipcMain.handle('usage:listByRange', (_e, query: { startDate: string; endDate: string }) => {
     if (!query || !DATE_RE.test(query.startDate ?? '') || !DATE_RE.test(query.endDate ?? '')) {
       throw new Error('日期格式应为 YYYY-MM-DD')

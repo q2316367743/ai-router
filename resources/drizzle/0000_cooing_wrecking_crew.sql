@@ -1,6 +1,7 @@
 CREATE TABLE `providers` (
 	`id` text PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,
+	`protocol` text DEFAULT 'openai' NOT NULL,
 	`base_url` text NOT NULL,
 	`api_key` text NOT NULL,
 	`enabled` integer DEFAULT true NOT NULL,
@@ -28,8 +29,10 @@ CREATE TABLE `settings` (
 --> statement-breakpoint
 CREATE TABLE `request_logs` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`request_id` text NOT NULL,
 	`log_date` text NOT NULL,
-	`created_at` integer NOT NULL,
+	`started_at` integer NOT NULL,
+	`finished_at` integer NOT NULL,
 	`public_model` text NOT NULL,
 	`provider_name` text NOT NULL,
 	`upstream_model` text NOT NULL,
@@ -39,17 +42,53 @@ CREATE TABLE `request_logs` (
 	`stream` integer DEFAULT false NOT NULL,
 	`prompt_tokens` integer DEFAULT 0 NOT NULL,
 	`completion_tokens` integer DEFAULT 0 NOT NULL,
+	`reasoning_tokens` integer DEFAULT 0 NOT NULL,
+	`cache_read_tokens` integer DEFAULT 0 NOT NULL,
+	`cache_write_tokens` integer DEFAULT 0 NOT NULL,
+	`unrecognized_tokens` integer DEFAULT 0 NOT NULL,
 	`total_tokens` integer DEFAULT 0 NOT NULL,
+	`request_body` text,
+	`request_headers` text,
+	`response_body` text,
+	`response_headers` text,
 	`error` text
 );
 --> statement-breakpoint
 CREATE INDEX `idx_request_logs_date` ON `request_logs` (`log_date`);--> statement-breakpoint
 CREATE TABLE `usage_daily` (
 	`date` text NOT NULL,
+	`provider_name` text NOT NULL,
 	`public_model` text NOT NULL,
 	`request_count` integer DEFAULT 0 NOT NULL,
+	`success_count` integer DEFAULT 0 NOT NULL,
+	`fail_count` integer DEFAULT 0 NOT NULL,
+	`duration_ms` integer DEFAULT 0 NOT NULL,
 	`prompt_tokens` integer DEFAULT 0 NOT NULL,
 	`completion_tokens` integer DEFAULT 0 NOT NULL,
+	`reasoning_tokens` integer DEFAULT 0 NOT NULL,
+	`cache_read_tokens` integer DEFAULT 0 NOT NULL,
+	`cache_write_tokens` integer DEFAULT 0 NOT NULL,
+	`unrecognized_tokens` integer DEFAULT 0 NOT NULL,
 	`total_tokens` integer DEFAULT 0 NOT NULL,
-	PRIMARY KEY(`date`, `public_model`)
+	PRIMARY KEY(`date`, `provider_name`, `public_model`)
 );
+--> statement-breakpoint
+CREATE TABLE `usage_hourly` (
+	`hour_key` text NOT NULL,
+	`provider_name` text NOT NULL,
+	`public_model` text NOT NULL,
+	`request_count` integer DEFAULT 0 NOT NULL,
+	`success_count` integer DEFAULT 0 NOT NULL,
+	`fail_count` integer DEFAULT 0 NOT NULL,
+	`duration_ms` integer DEFAULT 0 NOT NULL,
+	`prompt_tokens` integer DEFAULT 0 NOT NULL,
+	`completion_tokens` integer DEFAULT 0 NOT NULL,
+	`reasoning_tokens` integer DEFAULT 0 NOT NULL,
+	`cache_read_tokens` integer DEFAULT 0 NOT NULL,
+	`cache_write_tokens` integer DEFAULT 0 NOT NULL,
+	`unrecognized_tokens` integer DEFAULT 0 NOT NULL,
+	`total_tokens` integer DEFAULT 0 NOT NULL,
+	PRIMARY KEY(`hour_key`, `provider_name`, `public_model`)
+);
+--> statement-breakpoint
+CREATE INDEX `idx_usage_hourly_key` ON `usage_hourly` (`hour_key`);

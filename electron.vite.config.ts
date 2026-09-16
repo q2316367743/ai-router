@@ -68,6 +68,15 @@ export default defineConfig({
       })
     ],
     base: './',
+    build: {
+      rollupOptions: {
+        // 多窗口入口：主窗口 index.html + 托盘统计面板 tray.html
+        input: {
+          index: resolve('src/renderer/index.html'),
+          tray: resolve('src/renderer/tray.html')
+        }
+      }
+    },
     server: {
       port: 7744
     }

@@ -44,8 +44,21 @@ mediaQuery.addEventListener('change', (e: MediaQueryListEvent) => {
   }
 })
 
+// 多窗口同步：主窗口与托盘面板共享 localStorage，任一窗口切换后另一窗口即时跟随
+window.addEventListener('storage', (e: StorageEvent) => {
+  if (e.key !== STORAGE_KEY) return
+  const next = readStoredMode()
+  if (!next || next === mode.value) return
+  mode.value = next
+  syncIsDark(next)
+})
+
 renderColorMode()
 
-export const useColorMode = (): { isDark: typeof isDark; mode: typeof mode; setColorMode: typeof setColorMode } => {
+export const useColorMode = (): {
+  isDark: typeof isDark
+  mode: typeof mode
+  setColorMode: typeof setColorMode
+} => {
   return { isDark, mode, setColorMode }
 }

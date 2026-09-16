@@ -5,6 +5,7 @@ import { providerApi } from '~/modules/provider/provider'
 import { modelApi } from '~/modules/model/model'
 import { serviceApi } from '~/modules/service/service'
 import { logApi } from '~/modules/log/log'
+import { trayApi } from '~/modules/tray/tray'
 import { usageApi } from '~/modules/usage/usage'
 
 // 各域 API 在 src/preload/src/modules/<域>/ 实现，在此组装暴露给渲染层（window.preload）。
@@ -15,7 +16,8 @@ const preload = {
   model: modelApi,
   service: serviceApi,
   log: logApi,
-  usage: usageApi
+  usage: usageApi,
+  tray: trayApi
 }
 
 if (process.contextIsolated) {

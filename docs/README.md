@@ -9,14 +9,15 @@
 | 文档                                             | 描述                                                                                                             |
 |--------------------------------------------------|------------------------------------------------------------------------------------------------------------------|
 | [01-init.md](./app/01-init.md)                   | 项目初始化（2026-09-15）：参考 mistrelle 搭建 electron-vite 骨架（main/preload/renderer/common 四段 + windows 多窗口模式）、TDesign + UnoCSS + 自动导入 + Pinia + Vue Router、drizzle + better-sqlite3 数据库基线、db:ping 全链路示例、各配置文件要点与别名约定 |
-| [02-管理界面.md](./app/02-管理界面.md)           | 管理界面（2026-09-15）：侧边栏布局（t-menu 路由导航）、7 个页面职责与数据来源（含日志页条件分页 + 行展开详情/JSON 高亮）、3 组命令式弹窗两文件模式、server:status 状态推送链路 |
-| [03-托盘.md](./app/03-托盘.md)                   | 系统托盘（2026-09-16）：registerAppTray/refreshTrayUsage 双通道刷新（写库即时 + 30s 兜底）、macOS 标题显示今日用量（K/M/E 口径见 formatTokens）、showMainWindow 重开修复、平台差异说明 |
+| [02-管理界面.md](./app/02-管理界面.md)           | 管理界面（2026-09-15）：侧边栏布局（t-menu 路由导航）、7 个页面职责与数据来源（首页统计看板 + 用量明细表 + 日志页条件分页/行展开详情）、3 组命令式弹窗两文件模式、通用组件目录（PageLayout / EChart / usage）、server:status 状态推送链路 |
+| [03-托盘.md](./app/03-托盘.md)                   | 系统托盘（2026-09-16）：registerAppTray/refreshTrayUsage 双通道刷新（写库即时 + 30s 兜底）、统计面板弹窗（trayPanel 窗口定位/失焦隐藏/点击竞态抑制）、click 与 right-click 平台分支（macOS 不可同时 setContextMenu）、macOS 标题显示今日用量 |
+| [04-统计看板.md](./app/04-统计看板.md)           | 统计看板（2026-09-16）：用量聚合重构（usage_daily 增加供应商/缓存/成功失败/耗时维度 + usage_hourly 小时表）、统一写入路径 recordRequest、统计口径权威定义表、时间维度解析与活跃度窗口、echarts 图表基元（按需注册 + token 取色）、共享看板组件、首页与托盘面板双端结构 |
 
 ### data/ —— 数据模型
 
 | 文档                                             | 描述                                                                                                             |
 |--------------------------------------------------|------------------------------------------------------------------------------------------------------------------|
-| [01-数据模型.md](./data/01-数据模型.md)          | 5 张表结构（providers/models/settings/request_logs/usage_daily）、request_logs 全量采集字段（正文/标头/七维 token/请求 ID）与最近 7 天惰性清理策略、repo 与 IPC 通道清单、@common/types 三端契约组织、新增表流程备忘 |
+| [01-数据模型.md](./data/01-数据模型.md)          | 6 张表结构（providers/models/settings/request_logs/usage_daily/usage_hourly）、request_logs 全量采集字段（正文/标头/七维 token/请求 ID）与最近 7 天惰性清理策略、用量双粒度聚合表（日永久 + 小时 7 天）与 7 类统计口径、repo 与 IPC 通道清单、@common/types 三端契约组织、新增表流程备忘 |
 
 ### server/ —— 本地代理服务
 

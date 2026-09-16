@@ -1,1 +1,0 @@
-ALTER TABLE `providers` ADD `protocol` text DEFAULT 'openai' NOT NULL;

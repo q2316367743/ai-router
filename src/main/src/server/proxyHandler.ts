@@ -4,8 +4,7 @@ import { findMapping } from '$/db/repo/modelRepo'
 import { errMsg, sendOpenAiError } from './httpRespond'
 import { buildForwardHeaders, collectExtraHeaders } from './forwardHeaders'
 import {
-  addUsageQuietly,
-  recordLocalLog,
+  recordRequest,
   serializeRequestHeaders,
   serializeResponseHeaders,
   type TokenUsage
@@ -35,7 +34,7 @@ export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Pr
   const parsed: unknown = req.body
   if (!isRecord(parsed)) {
     const resBody = sendOpenAiError(res, 400, 'Request body is not valid JSON')
-    recordLocalLog({
+    recordRequest({
       path,
       requestId,
       publicModel: '-',
@@ -58,7 +57,7 @@ export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Pr
   const publicModel = typeof parsed['model'] === 'string' ? parsed['model'] : ''
   if (!publicModel) {
     const resBody = sendOpenAiError(res, 400, "'model' is required")
-    recordLocalLog({
+    recordRequest({
       path,
       requestId,
       publicModel: '-',
@@ -85,7 +84,7 @@ export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Pr
       `The model '${publicModel}' does not exist`,
       'model_not_found'
     )
-    recordLocalLog({
+    recordRequest({
       path,
       requestId,
       publicModel,
@@ -145,7 +144,7 @@ export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Pr
     // signal 被 abort 只源于客户端断开：不回写，记 499（与转换路径一致）
     if (controller.signal.aborted) {
       res.destroy()
-      recordLocalLog({
+      recordRequest({
         path: logPath,
         requestId,
         publicModel,
@@ -164,7 +163,7 @@ export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Pr
       return
     }
     const resBody = sendOpenAiError(res, 502, `Upstream request failed: ${errMsg(err)}`)
-    recordLocalLog({
+    recordRequest({
       path: logPath,
       requestId,
       publicModel,
@@ -189,7 +188,7 @@ export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Pr
     ? await pipeStreamResponse(upstream, res)
     : await bufferResponse(upstream, res)
 
-  recordLocalLog({
+  recordRequest({
     path: logPath,
     requestId,
     publicModel,
@@ -205,10 +204,6 @@ export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Pr
     resBody: pass.resBody,
     resHeaders
   })
-  // 用量只在请求成功时累加（失败请求 tokens 不可信）
-  if (upstream.ok) {
-    addUsageQuietly(publicModel, pass.usage)
-  }
 }
 
 /** 非流式：读完上游 body 一次性返回 */

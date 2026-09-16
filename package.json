@@ -48,6 +48,7 @@
     "@vueuse/core": "^9.13.0",
     "dayjs": "^1.11.14",
     "drizzle-kit": "^0.31.10",
+    "echarts": "^6.1.0",
     "electron": "^39.2.6",
     "electron-builder": "^26.0.12",
     "electron-vite": "^5.0.0",
