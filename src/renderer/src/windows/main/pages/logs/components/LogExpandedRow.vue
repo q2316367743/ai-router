@@ -15,7 +15,7 @@
         <t-alert
           v-if="isPendingStatus(log.status)"
           theme="info"
-          class="mb-12px"
+          style="margin-bottom: 12px"
           message="请求进行中：状态码、耗时与 token 用量将在响应结束后回填"
         />
         <t-descriptions :column="4" bordered size="small">
