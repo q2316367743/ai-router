@@ -1,8 +1,8 @@
 <template>
   <PageLayout title="服务">
     <div class="p-24px">
-      <!-- 服务开关 -->
-      <div class="card mb-12px">
+      <!-- 服务配置 -->
+      <t-card title="服务配置" header-bordered class="mb-12px">
         <div class="flex items-center justify-between">
           <div>
             <div class="font-500">启用本地服务</div>
@@ -10,10 +10,9 @@
           </div>
           <t-switch :value="config.enabled" :loading="switching" @change="toggleEnabled" />
         </div>
-      </div>
 
-      <!-- 监听端口 -->
-      <div class="card mb-12px">
+        <t-divider />
+
         <div class="font-500 mb-8px">监听端口</div>
         <div class="flex items-center gap-8px">
           <t-input-number
@@ -35,20 +34,20 @@
         <div class="text-13px text-td-placeholder mt-8px">
           仅监听 127.0.0.1，修改端口后服务自动重启
         </div>
-      </div>
+      </t-card>
 
-      <!-- API Key -->
-      <div class="card mb-12px">
+      <!-- 对接信息 -->
+      <t-card title="对接信息" header-bordered class="mb-12px">
         <div class="font-500 mb-8px">对外 API Key</div>
-        <div class="flex items-center gap-8px">
+        <div class="mb-12px">
           <code class="text-13px break-all">{{ displayKey }}</code>
         </div>
-        <div class="flex items-center gap-4px mt-8px">
+        <div class="flex items-center gap-8px">
           <t-button variant="outline" size="small" @click="showKey = !showKey">
             <template #icon><t-icon :name="showKey ? 'browse' : 'browse-off'" /></template>
             {{ showKey ? '隐藏' : '显示' }}
           </t-button>
-          <t-button variant="outline" size="small" @click="copyKey">
+          <t-button variant="outline" size="small" @click="copyText(config.apiKey)">
             <template #icon><t-icon name="file-copy" /></template>
             复制
           </t-button>
@@ -56,22 +55,23 @@
             <t-button variant="outline" size="small" theme="danger">重新生成</t-button>
           </t-popconfirm>
         </div>
-      </div>
 
-      <!-- 接入示例 -->
-      <div class="card">
-        <div class="flex items-center justify-between mb-8px">
-          <div class="font-500">接入示例（OpenAI 兼容）</div>
-          <t-button variant="text" size="small" theme="primary" @click="copyExample">
+        <t-divider />
+
+        <div class="font-500 mb-8px">接入端点</div>
+        <div class="flex items-center gap-4px">
+          <code class="text-13px break-all">{{ endpoint }}</code>
+          <t-button variant="text" shape="square" size="small" @click="copyText(endpoint)">
             <template #icon><t-icon name="file-copy" /></template>
-            复制
           </t-button>
         </div>
-        <pre class="code-block">{{ example }}</pre>
         <div class="text-13px text-td-placeholder mt-8px">
-          客户端 Base URL 填 {{ endpoint }}，模型名使用「模型映射」中定义的对外名称
+          客户端 Base URL 填此项，模型名使用「模型映射」中定义的对外名称
         </div>
-      </div>
+      </t-card>
+
+      <!-- 接入示例 -->
+      <ServiceAccessExamples :endpoint="endpoint" :api-key="config.apiKey" />
     </div>
   </PageLayout>
 </template>
@@ -80,6 +80,7 @@
 import type { ServiceConfig, ServiceStatus } from '@common/types'
 import { maskKey } from '@/utils/format'
 import PageLayout from '@/components/PageLayout/PageLayout.vue'
+import ServiceAccessExamples from './components/ServiceAccessExamples.vue'
 import { MessageUtil } from '@/utils/modal'
 
 const config = ref<ServiceConfig>({ port: 8910, apiKey: '', enabled: false })
@@ -101,17 +102,6 @@ const stateHint = computed(() => {
 
 const displayKey = computed(() =>
   showKey.value ? config.value.apiKey : maskKey(config.value.apiKey)
-)
-
-const example = computed(
-  () => `curl ${endpoint.value}/chat/completions \\
-  -H "Authorization: Bearer ${config.value.apiKey}" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "model": "<对外模型名>",
-    "messages": [{ "role": "user", "content": "hello" }],
-    "stream": true
-  }'`
 )
 
 async function toggleEnabled(enabled: unknown): Promise<void> {
@@ -146,9 +136,13 @@ async function savePort(): Promise<void> {
   }
 }
 
-async function copyKey(): Promise<void> {
+async function copyText(text: string): Promise<void> {
+  if (!text) {
+    MessageUtil.error('暂无可复制内容')
+    return
+  }
   try {
-    await navigator.clipboard.writeText(config.value.apiKey)
+    await navigator.clipboard.writeText(text)
     MessageUtil.success('已复制')
   } catch {
     MessageUtil.error('复制失败')
@@ -162,15 +156,6 @@ async function regenerate(): Promise<void> {
     MessageUtil.success('已重新生成')
   } catch (err) {
     MessageUtil.error(err instanceof Error ? err.message : '操作失败')
-  }
-}
-
-async function copyExample(): Promise<void> {
-  try {
-    await navigator.clipboard.writeText(example.value)
-    MessageUtil.success('已复制')
-  } catch {
-    MessageUtil.error('复制失败')
   }
 }
 
@@ -192,24 +177,3 @@ onUnmounted(() => {
   unsubscribe = null
 })
 </script>
-
-<style lang="less" scoped>
-.card {
-  padding: 16px;
-  border-radius: var(--fluent-radius-card);
-  background: var(--td-bg-color-secondarycontainer);
-  border: 1px solid var(--fluent-border-subtle);
-}
-
-.code-block {
-  margin: 0;
-  padding: 12px;
-  border-radius: var(--fluent-radius-smooth);
-  background: var(--td-bg-color-container);
-  border: 1px solid var(--fluent-border-subtle);
-  font-size: 12px;
-  line-height: 1.6;
-  overflow-x: auto;
-  white-space: pre;
-}
-</style>

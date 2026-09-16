@@ -19,6 +19,7 @@ declare module 'vue' {
     TDateRangePicker: typeof import('tdesign-vue-next')['DateRangePicker']
     TDescriptions: typeof import('tdesign-vue-next')['Descriptions']
     TDescriptionsItem: typeof import('tdesign-vue-next')['DescriptionsItem']
+    TDivider: typeof import('tdesign-vue-next')['Divider']
     TForm: typeof import('tdesign-vue-next')['Form']
     TFormItem: typeof import('tdesign-vue-next')['FormItem']
     TIcon: typeof import('tdesign-vue-next')['Icon']
@@ -34,6 +35,8 @@ declare module 'vue' {
     TSelect: typeof import('tdesign-vue-next')['Select']
     TSwitch: typeof import('tdesign-vue-next')['Switch']
     TTable: typeof import('tdesign-vue-next')['Table']
+    TTabPanel: typeof import('tdesign-vue-next')['TabPanel']
+    TTabs: typeof import('tdesign-vue-next')['Tabs']
     TTag: typeof import('tdesign-vue-next')['Tag']
     TTooltip: typeof import('tdesign-vue-next')['Tooltip']
   }
