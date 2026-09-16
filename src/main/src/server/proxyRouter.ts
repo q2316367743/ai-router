@@ -1,8 +1,9 @@
+import { randomUUID } from 'node:crypto'
 import express, { type Express, type NextFunction, type Request, type Response } from 'express'
 import { listModelMappings } from '$/db/repo/modelRepo'
 import { getServiceConfig } from '$/db/repo/settingRepo'
 import { errMsg, sendJson, sendOpenAiError } from './httpRespond'
-import { recordLocalLog } from './proxyLog'
+import { recordLocalLog, serializeRequestHeaders } from './proxyLog'
 import { forwardRequest } from './proxyHandler'
 
 /** 请求体上限：32MB，防异常大包拖垮内存 */
@@ -14,6 +15,7 @@ export function createProxyApp(): Express {
 
   // CORS：预检直接放行（allow-headers 回显客户端申请的自定义头，如 x-session-id）；其余响应统一放行来源
   app.use((req, res, next) => {
+    console.log(req.path)
     if (req.method === 'OPTIONS') {
       const requested = req.headers['access-control-request-headers']
       res.writeHead(204, {
@@ -31,22 +33,29 @@ export function createProxyApp(): Express {
   })
 
   // 全局 Key 鉴权：兼容 Authorization: Bearer 与 x-api-key；失败记日志后返回 401
+  // （位于 express.json 之前，此分支拿不到请求正文）
   app.use((req, res, next) => {
     if (isAuthorized(req, getServiceConfig().apiKey)) {
       next()
       return
     }
-    sendOpenAiError(res, 401, 'Invalid API key provided', 'invalid_api_key')
+    const startedAt = Date.now()
+    const resBody = sendOpenAiError(res, 401, 'Invalid API key provided', 'invalid_api_key')
     recordLocalLog({
       path: req.originalUrl,
+      requestId: randomUUID(),
       publicModel: '-',
       providerName: '-',
       upstreamModel: '-',
-      startedAt: Date.now(),
+      startedAt,
       status: 401,
       stream: false,
       usage: null,
-      error: 'invalid api key'
+      error: 'invalid api key',
+      reqBody: null,
+      reqHeaders: serializeRequestHeaders(req.headers),
+      resBody,
+      resHeaders: null
     })
   })
 

@@ -57,5 +57,8 @@ export function updateProvider(input: ProviderInput): void {
 }
 
 export function removeProvider(id: string): void {
-  db().delete(providers).where(sql`${providers.id} = ${id}`).run()
+  db()
+    .delete(providers)
+    .where(sql`${providers.id} = ${id}`)
+    .run()
 }

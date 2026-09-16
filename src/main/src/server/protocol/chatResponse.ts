@@ -34,20 +34,27 @@ interface ChunkDelta {
   tool_calls?: WireToolCallDelta[]
 }
 
-/** ai-sdk 统一 usage → 日志库 TokenUsage */
+/** ai-sdk 统一 usage → 日志库 TokenUsage（详情字段仅入日志，不改变线上 usage 块格式） */
 export function toTokenUsage(usage: LanguageModelUsage | undefined): TokenUsage {
   const prompt = usage?.inputTokens ?? 0
   const completion = usage?.outputTokens ?? 0
   return {
     promptTokens: prompt,
     completionTokens: completion,
+    reasoningTokens: usage?.outputTokenDetails?.reasoningTokens ?? 0,
+    cacheReadTokens: usage?.inputTokenDetails?.cacheReadTokens ?? 0,
+    cacheWriteTokens: usage?.inputTokenDetails?.cacheWriteTokens ?? 0,
     totalTokens: usage?.totalTokens ?? prompt + completion
   }
 }
 
 export function toChatUsage(usage: LanguageModelUsage | undefined): ChatUsage {
   const t = toTokenUsage(usage)
-  return { prompt_tokens: t.promptTokens, completion_tokens: t.completionTokens, total_tokens: t.totalTokens }
+  return {
+    prompt_tokens: t.promptTokens,
+    completion_tokens: t.completionTokens,
+    total_tokens: t.totalTokens
+  }
 }
 
 export function mapFinishReason(reason: AiFinishReason): ChatFinishReason {
@@ -81,33 +88,56 @@ export interface ChunkWriter {
   /** 兜底：上游未发出 input-start/delta 时直接下发完整工具调用 */
   toolCallComplete(id: string, name: string, argsJson: string): Promise<void>
   finish(reason: ChatFinishReason, usage: ChatUsage): Promise<void>
-  /** 流已开始后中途出错：以 OpenAI 流内 error 块收尾 */
-  errorMidStream(message: string): Promise<void>
+  /** 流已开始后中途出错：以 OpenAI 流内 error 块收尾，返回写出的正文文本 */
+  errorMidStream(message: string): Promise<string | null>
   end(): void
+  /** 实际下发给客户端的全部 SSE 文本（日志响应正文） */
+  dump(): string
 }
 
 export function createChunkWriter(res: ServerResponse, model: string): ChunkWriter {
   const id = makeCompletionId()
   const created = Math.floor(Date.now() / 1000)
   const toolIndexes = new Map<string, number>()
+  const captured: string[] = []
   let nextIndex = 0
   let headWritten = false
 
-  const envelope = (): ChunkEnvelope => ({ id, object: 'chat.completion.chunk', created, model, choices: [] })
+  const envelope = (): ChunkEnvelope => ({
+    id,
+    object: 'chat.completion.chunk',
+    created,
+    model,
+    choices: []
+  })
 
-  const send = async (delta: ChunkDelta, finishReason: ChatFinishReason | null, usage?: ChatUsage): Promise<void> => {
+  const send = async (
+    delta: ChunkDelta,
+    finishReason: ChatFinishReason | null,
+    usage?: ChatUsage
+  ): Promise<void> => {
     if (res.writableEnded || res.destroyed) return
     if (!headWritten) {
       headWritten = true
-      res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' })
+      res.writeHead(200, {
+        'content-type': 'text/event-stream',
+        'cache-control': 'no-cache',
+        connection: 'keep-alive'
+      })
       const first = envelope()
       first.choices = [{ index: 0, delta: { role: 'assistant', content: '' }, finish_reason: null }]
-      res.write(`data: ${JSON.stringify(first)}\n\n`)
+      await write(`data: ${JSON.stringify(first)}\n\n`)
     }
     const chunk = envelope()
     chunk.choices = [{ index: 0, delta, finish_reason: finishReason }]
     if (usage) chunk.usage = usage
-    if (!res.write(`data: ${JSON.stringify(chunk)}\n\n`)) {
+    await write(`data: ${JSON.stringify(chunk)}\n\n`)
+  }
+
+  /** 写出并记录（背压等待 drain），记录内容供日志响应正文使用 */
+  const write = async (line: string): Promise<void> => {
+    captured.push(line)
+    if (!res.write(line)) {
       await new Promise<void>((resolve) => res.once('drain', resolve))
     }
   }
@@ -127,14 +157,28 @@ export function createChunkWriter(res: ServerResponse, model: string): ChunkWrit
     text: (delta) => send({ content: delta }, null),
     reasoning: (delta) => send({ reasoning_content: delta }, null),
     toolInputStart: async (id, name) => {
-      await send({ tool_calls: [{ index: toolIndex(id), id, type: 'function', function: { name, arguments: '' } }] }, null)
+      await send(
+        {
+          tool_calls: [
+            { index: toolIndex(id), id, type: 'function', function: { name, arguments: '' } }
+          ]
+        },
+        null
+      )
     },
     toolInputDelta: async (id, delta) => {
       await send({ tool_calls: [{ index: toolIndex(id), function: { arguments: delta } }] }, null)
     },
     toolCallComplete: async (id, name, argsJson) => {
       if (toolIndexes.has(id)) return
-      await send({ tool_calls: [{ index: toolIndex(id), id, type: 'function', function: { name, arguments: argsJson } }] }, null)
+      await send(
+        {
+          tool_calls: [
+            { index: toolIndex(id), id, type: 'function', function: { name, arguments: argsJson } }
+          ]
+        },
+        null
+      )
     },
     finish: async (reason, usage) => {
       await send({}, reason)
@@ -142,23 +186,26 @@ export function createChunkWriter(res: ServerResponse, model: string): ChunkWrit
       const tail = envelope()
       tail.choices = []
       tail.usage = usage
-      if (!res.writableEnded && !res.destroyed) res.write(`data: ${JSON.stringify(tail)}\n\n`)
+      if (!res.writableEnded && !res.destroyed) await write(`data: ${JSON.stringify(tail)}\n\n`)
     },
     errorMidStream: async (message) => {
-      if (!res.writableEnded && !res.destroyed) {
-        res.write(`data: ${JSON.stringify({ error: { message, type: 'api_error', code: null } })}\n\n`)
-      }
+      if (res.writableEnded || res.destroyed) return null
+      const line = `data: ${JSON.stringify({ error: { message, type: 'api_error', code: null } })}\n\n`
+      await write(line)
+      return line
     },
     end: () => {
       if (!res.writableEnded && !res.destroyed) {
+        captured.push('data: [DONE]\n\n')
         res.write('data: [DONE]\n\n')
         res.end()
       }
-    }
+    },
+    dump: () => captured.join('')
   }
 }
 
-/** 非流式成功响应：一次性写出 chat.completion JSON */
+/** 非流式成功响应：一次性写出 chat.completion JSON，返回实际写出的正文文本（连接已关闭时为 null） */
 export function sendChatCompletion(
   res: ServerResponse,
   args: {
@@ -169,7 +216,7 @@ export function sendChatCompletion(
     finishReason: ChatFinishReason
     usage: ChatUsage
   }
-): void {
+): string | null {
   const message: Record<string, unknown> = { role: 'assistant', content: args.content }
   if (args.reasoning) message['reasoning_content'] = args.reasoning
   if (args.toolCalls.length) {
@@ -179,7 +226,7 @@ export function sendChatCompletion(
       function: { name: call.name, arguments: call.argsJson }
     }))
   }
-  sendJsonOnce(res, 200, {
+  return sendJsonOnce(res, 200, {
     id: makeCompletionId(),
     object: 'chat.completion',
     created: Math.floor(Date.now() / 1000),
@@ -189,8 +236,10 @@ export function sendChatCompletion(
   })
 }
 
-function sendJsonOnce(res: ServerResponse, status: number, payload: unknown): void {
-  if (res.writableEnded || res.destroyed) return
+function sendJsonOnce(res: ServerResponse, status: number, payload: unknown): string | null {
+  if (res.writableEnded || res.destroyed) return null
+  const body = JSON.stringify(payload)
   res.writeHead(status, { 'content-type': 'application/json' })
-  res.end(JSON.stringify(payload))
+  res.end(body)
+  return body
 }

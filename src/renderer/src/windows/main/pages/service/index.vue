@@ -77,11 +77,10 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { MessagePlugin } from 'tdesign-vue-next'
 import type { ServiceConfig, ServiceStatus } from '@common/types'
 import { maskKey } from '@/utils/format'
 import PageLayout from '@/components/PageLayout/PageLayout.vue'
+import { MessageUtil } from '@/utils/modal'
 
 const config = ref<ServiceConfig>({ port: 8910, apiKey: '', enabled: false })
 const status = ref<ServiceStatus>({ state: 'stopped', port: 0 })
@@ -123,9 +122,9 @@ async function toggleEnabled(enabled: unknown): Promise<void> {
       enabled: enabled === true
     })
     config.value.enabled = enabled === true
-    MessagePlugin.success(enabled === true ? '服务已开启' : '服务已关闭')
+    MessageUtil.success(enabled === true ? '服务已开启' : '服务已关闭')
   } catch (err) {
-    MessagePlugin.error(err instanceof Error ? err.message : '操作失败')
+    MessageUtil.error(err instanceof Error ? err.message : '操作失败')
   } finally {
     switching.value = false
   }
@@ -139,9 +138,9 @@ async function savePort(): Promise<void> {
       port: portDraft.value
     })
     config.value.port = portDraft.value
-    MessagePlugin.success('端口已保存，服务已重启')
+    MessageUtil.success('端口已保存，服务已重启')
   } catch (err) {
-    MessagePlugin.error(err instanceof Error ? err.message : '保存失败')
+    MessageUtil.error(err instanceof Error ? err.message : '保存失败')
   } finally {
     savingPort.value = false
   }
@@ -150,9 +149,9 @@ async function savePort(): Promise<void> {
 async function copyKey(): Promise<void> {
   try {
     await navigator.clipboard.writeText(config.value.apiKey)
-    MessagePlugin.success('已复制')
+    MessageUtil.success('已复制')
   } catch {
-    MessagePlugin.error('复制失败')
+    MessageUtil.error('复制失败')
   }
 }
 
@@ -160,18 +159,18 @@ async function regenerate(): Promise<void> {
   try {
     config.value.apiKey = await window.preload.service.regenerateKey()
     showKey.value = true
-    MessagePlugin.success('已重新生成')
+    MessageUtil.success('已重新生成')
   } catch (err) {
-    MessagePlugin.error(err instanceof Error ? err.message : '操作失败')
+    MessageUtil.error(err instanceof Error ? err.message : '操作失败')
   }
 }
 
 async function copyExample(): Promise<void> {
   try {
     await navigator.clipboard.writeText(example.value)
-    MessagePlugin.success('已复制')
+    MessageUtil.success('已复制')
   } catch {
-    MessagePlugin.error('复制失败')
+    MessageUtil.error('复制失败')
   }
 }
 

@@ -3,6 +3,7 @@ import { createOpenAI } from '@ai-sdk/openai'
 import type { LanguageModel } from 'ai'
 import type { MappingRoute } from '$/db/repo/modelRepo'
 import type { ReasoningEffort } from './types'
+import { normalizeBaseUrl } from './upstreamUrl'
 
 /** reasoning_effort → Anthropic thinking 预算（budgetTokens 下限 1024） */
 const THINKING_BUDGET: Partial<Record<ReasoningEffort, number>> = {
@@ -47,7 +48,7 @@ function planAnthropic(
 ): UpstreamPlan {
   const anthropic = createAnthropic({
     apiKey: route.providerApiKey,
-    baseURL: ensureVersioned(route.providerBaseUrl),
+    baseURL: normalizeBaseUrl(route.providerBaseUrl),
     headers: extraHeaders
   })
   const budget = effort ? THINKING_BUDGET[effort] : undefined
@@ -73,7 +74,7 @@ function planResponses(
 ): UpstreamPlan {
   const openai = createOpenAI({
     apiKey: route.providerApiKey,
-    baseURL: ensureVersioned(route.providerBaseUrl),
+    baseURL: normalizeBaseUrl(route.providerBaseUrl),
     headers: extraHeaders
   })
   return {
@@ -83,10 +84,4 @@ function planResponses(
     disableSampling: false,
     maxOutputTokens: clientMax
   }
-}
-
-/** ai-sdk 各 provider 的 baseURL 需以 /v1 结尾（SDK 只追加 /messages、/responses 等末段） */
-function ensureVersioned(rawBaseUrl: string): string {
-  const trimmed = rawBaseUrl.trim().replace(/\/+$/, '')
-  return /\/v\d+$/.test(trimmed) ? trimmed : `${trimmed}/v1`
 }

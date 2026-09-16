@@ -39,9 +39,8 @@
 </template>
 
 <script lang="ts" setup>
-import { reactive, ref } from 'vue'
-import { MessagePlugin } from 'tdesign-vue-next'
 import type { ProviderInfo, ProviderProtocol } from '@common/types'
+import { MessageUtil } from '@/utils/modal'
 
 const props = defineProps<{
   provider: ProviderInfo | null
@@ -54,16 +53,16 @@ const emit = defineEmits<{
 
 const PROTOCOL_HINTS: Record<ProviderProtocol, { placeholder: string; help: string }> = {
   openai: {
-    placeholder: 'https://api.deepseek.com',
-    help: '填到域名即可：客户端请求路径会原样拼接到该地址后'
+    placeholder: 'https://api.deepseek.com/v1',
+    help: '填完整 API 根（含 /v1 等版本/路径前缀，火山云形如 /api/plan/v3）：代理在其后拼 /chat/completions'
   },
   'openai-responses': {
-    placeholder: 'https://api.openai.com',
-    help: '填到域名即可：代理自动补 /v1，请求上游 /responses 接口'
+    placeholder: 'https://api.openai.com/v1',
+    help: '填完整 API 根（含 /v1 等版本/路径前缀）：代理在其后拼 /responses'
   },
   anthropic: {
-    placeholder: 'https://api.anthropic.com',
-    help: '填到域名即可：代理自动补 /v1，请求上游 /messages 接口'
+    placeholder: 'https://api.anthropic.com/v1',
+    help: '填完整 API 根（含 /v1 等版本/路径前缀）：代理在其后拼 /messages'
   }
 }
 
@@ -80,15 +79,15 @@ const form = reactive({
 
 async function submit(): Promise<void> {
   if (!form.name.trim()) {
-    MessagePlugin.warning('请输入名称')
+    MessageUtil.warning('请输入名称')
     return
   }
   if (!form.baseUrl.trim()) {
-    MessagePlugin.warning('请输入 Base URL')
+    MessageUtil.warning('请输入 Base URL')
     return
   }
   if (!form.apiKey.trim()) {
-    MessagePlugin.warning('请输入 API Key')
+    MessageUtil.warning('请输入 API Key')
     return
   }
   saving.value = true
@@ -106,10 +105,10 @@ async function submit(): Promise<void> {
     } else {
       await window.preload.provider.create(payload)
     }
-    MessagePlugin.success(props.provider ? '已保存' : '已创建')
+    MessageUtil.success(props.provider ? '已保存' : '已创建')
     emit('success')
   } catch (err) {
-    MessagePlugin.error(err instanceof Error ? err.message : '保存失败')
+    MessageUtil.error(err instanceof Error ? err.message : '保存失败')
   } finally {
     saving.value = false
   }

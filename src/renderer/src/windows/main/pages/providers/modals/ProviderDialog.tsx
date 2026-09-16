@@ -8,7 +8,7 @@ export function openProviderDialog(provider: ProviderInfo | null, onSaved: () =>
   const dp = DialogPlugin({
     header: provider ? '编辑提供商' : '新增提供商',
     placement: 'center',
-    width: '480px',
+    width: '600px',
     footer: false,
     destroyOnClose: true,
     body: () =>

@@ -9,18 +9,18 @@
 | 文档                                             | 描述                                                                                                             |
 |--------------------------------------------------|------------------------------------------------------------------------------------------------------------------|
 | [01-init.md](./app/01-init.md)                   | 项目初始化（2026-09-15）：参考 mistrelle 搭建 electron-vite 骨架（main/preload/renderer/common 四段 + windows 多窗口模式）、TDesign + UnoCSS + 自动导入 + Pinia + Vue Router、drizzle + better-sqlite3 数据库基线、db:ping 全链路示例、各配置文件要点与别名约定 |
-| [02-管理界面.md](./app/02-管理界面.md)           | 管理界面（2026-09-15）：侧边栏布局（t-menu 路由导航）、6 个页面（概览/提供商/模型映射/服务/日志/用量）职责与数据来源、3 组命令式弹窗两文件模式、server:status 状态推送链路 |
+| [02-管理界面.md](./app/02-管理界面.md)           | 管理界面（2026-09-15）：侧边栏布局（t-menu 路由导航）、7 个页面职责与数据来源（含日志页条件分页 + 行展开详情/JSON 高亮）、3 组命令式弹窗两文件模式、server:status 状态推送链路 |
 | [03-托盘.md](./app/03-托盘.md)                   | 系统托盘（2026-09-16）：registerAppTray/refreshTrayUsage 双通道刷新（写库即时 + 30s 兜底）、macOS 标题显示今日用量（K/M/E 口径见 formatTokens）、showMainWindow 重开修复、平台差异说明 |
 
 ### data/ —— 数据模型
 
 | 文档                                             | 描述                                                                                                             |
 |--------------------------------------------------|------------------------------------------------------------------------------------------------------------------|
-| [01-数据模型.md](./data/01-数据模型.md)          | 5 张表结构（providers/models/settings/request_logs/usage_daily）、日志惰性清理与用量累加策略、repo 与 IPC 通道清单、@common/types 三端契约组织、新增表流程备忘 |
+| [01-数据模型.md](./data/01-数据模型.md)          | 5 张表结构（providers/models/settings/request_logs/usage_daily）、request_logs 全量采集字段（正文/标头/七维 token/请求 ID）与最近 7 天惰性清理策略、repo 与 IPC 通道清单、@common/types 三端契约组织、新增表流程备忘 |
 
 ### server/ —— 本地代理服务
 
 | 文档                                             | 描述                                                                                                             |
 |--------------------------------------------------|------------------------------------------------------------------------------------------------------------------|
-| [01-本地代理服务.md](./server/01-本地代理服务.md) | 127.0.0.1 OpenAI 兼容代理：生命周期（启动/保存重启/退出）、鉴权（Bearer + x-api-key）、显式路由（/v1/models + /v1/chat/completions）、模型映射与同协议纯透传、SSE 流式管道与 usage 提取、OpenAI 风格错误表 |
-| [02-协议适配与转换.md](./server/02-协议适配与转换.md) | 三大接口支持（2026-09-16）：提供商接口类型（OpenAI Chat / OpenAI Responses / Anthropic Messages）、同协议透传 + 异协议经 ai-sdk 中间层双向转换（`src/main/src/server/protocol/`）、SSE 重编码与 reasoning_content 约定、baseUrl 补 /v1 规范化、转换路径限制清单 |
+| [01-本地代理服务.md](./server/01-本地代理服务.md) | 127.0.0.1 OpenAI 兼容代理：生命周期（启动/保存重启/退出）、鉴权（Bearer + x-api-key）、显式路由（/v1/models + /v1/chat/completions）、模型映射与同协议纯透传、SSE 流式管道与 usage（含明细）提取、请求/响应正文与标头全量采集（脱敏 + 兜底估算）、OpenAI 风格错误表 |
+| [02-协议适配与转换.md](./server/02-协议适配与转换.md) | 三大接口支持（2026-09-16）：提供商接口类型（OpenAI Chat / OpenAI Responses / Anthropic Messages）、同协议透传 + 异协议经 ai-sdk 中间层双向转换（`src/main/src/server/protocol/`）、SSE 重编码与 reasoning_content 约定、baseUrl 统一为完整 API 根（不补 /v1）、转换路径日志采集口径（usage 明细/dump 正文/上游响应头）、转换路径限制清单 |

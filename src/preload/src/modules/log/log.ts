@@ -1,12 +1,18 @@
 import { ipcRenderer } from 'electron'
-import type { RequestLogItem, TodayStats } from '@common/types'
+import type { LogFilterOptions, LogListQuery, LogListResult, RequestLogDetail, TodayStats } from '@common/types'
 
 export const logApi = {
-  listToday(): Promise<RequestLogItem[]> {
-    return ipcRenderer.invoke('log:listToday')
+  list(query: LogListQuery): Promise<LogListResult> {
+    return ipcRenderer.invoke('log:list', query)
   },
-  clear(): Promise<void> {
-    return ipcRenderer.invoke('log:clear')
+  filterOptions(): Promise<LogFilterOptions> {
+    return ipcRenderer.invoke('log:filterOptions')
+  },
+  getDetail(id: number): Promise<RequestLogDetail | null> {
+    return ipcRenderer.invoke('log:getDetail', id)
+  },
+  clearAll(): Promise<void> {
+    return ipcRenderer.invoke('log:clearAll')
   },
   todayStats(): Promise<TodayStats> {
     return ipcRenderer.invoke('log:todayStats')

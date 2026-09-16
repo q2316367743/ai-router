@@ -26,9 +26,8 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, onMounted, reactive, ref } from 'vue'
-import { MessagePlugin } from 'tdesign-vue-next'
 import type { ModelMappingInfo, ProviderInfo } from '@common/types'
+import { MessageUtil } from '@/utils/modal'
 
 const props = defineProps<{
   mapping: ModelMappingInfo | null
@@ -63,15 +62,15 @@ onMounted(() => {
 
 async function submit(): Promise<void> {
   if (!form.publicName.trim()) {
-    MessagePlugin.warning('请输入对外模型名')
+    MessageUtil.warning('请输入对外模型名')
     return
   }
   if (!form.providerId) {
-    MessagePlugin.warning('请选择提供商')
+    MessageUtil.warning('请选择提供商')
     return
   }
   if (!form.upstreamName.trim()) {
-    MessagePlugin.warning('请输入上游模型名')
+    MessageUtil.warning('请输入上游模型名')
     return
   }
   saving.value = true
@@ -88,10 +87,10 @@ async function submit(): Promise<void> {
     } else {
       await window.preload.model.create(payload)
     }
-    MessagePlugin.success(props.mapping ? '已保存' : '已创建')
+    MessageUtil.success(props.mapping ? '已保存' : '已创建')
     emit('success')
   } catch (err) {
-    MessagePlugin.error(err instanceof Error ? err.message : '保存失败')
+    MessageUtil.error(err instanceof Error ? err.message : '保存失败')
   } finally {
     saving.value = false
   }

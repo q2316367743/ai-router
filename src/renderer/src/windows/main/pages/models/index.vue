@@ -21,10 +21,16 @@
           </div>
         </template>
         <template #enabled="{ row }">
-          <t-switch :value="row.enabled" size="small" @change="(v: unknown) => toggleEnabled(row, v === true)" />
+          <t-switch
+            :value="row.enabled"
+            size="small"
+            @change="(v: unknown) => toggleEnabled(row, v === true)"
+          />
         </template>
         <template #op="{ row }">
-          <t-button variant="text" size="small" theme="primary" @click="openEdit(row)">编辑</t-button>
+          <t-button variant="text" size="small" theme="primary" @click="openEdit(row)"
+            >编辑</t-button
+          >
           <t-popconfirm content="确定删除该模型映射？" @confirm="remove(row)">
             <t-button variant="text" size="small" theme="danger">删除</t-button>
           </t-popconfirm>
@@ -35,11 +41,10 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, onMounted, ref } from 'vue'
 import type { ModelMappingInfo } from '@common/types'
-import { MessagePlugin } from 'tdesign-vue-next'
 import PageLayout from '@/components/PageLayout/PageLayout.vue'
 import { openModelDialog } from './modals/ModelDialog'
+import { MessageUtil } from '@/utils/modal'
 
 const list = ref<ModelMappingInfo[]>([])
 const loading = ref(false)
@@ -76,9 +81,9 @@ function openEdit(row: ModelMappingInfo): void {
 async function copyName(name: string): Promise<void> {
   try {
     await navigator.clipboard.writeText(name)
-    MessagePlugin.success('已复制')
+    MessageUtil.success('已复制')
   } catch {
-    MessagePlugin.error('复制失败')
+    MessageUtil.error('复制失败')
   }
 }
 
@@ -93,16 +98,16 @@ async function toggleEnabled(row: ModelMappingInfo, enabled: boolean): Promise<v
     })
     row.enabled = enabled
   } catch (err) {
-    MessagePlugin.error(err instanceof Error ? err.message : '操作失败')
+    MessageUtil.error(err instanceof Error ? err.message : '操作失败')
   }
 }
 
 async function remove(row: ModelMappingInfo): Promise<void> {
   try {
     await window.preload.model.remove(row.id)
-    MessagePlugin.success('已删除')
+    MessageUtil.success('已删除')
   } catch (err) {
-    MessagePlugin.error(err instanceof Error ? err.message : '删除失败')
+    MessageUtil.error(err instanceof Error ? err.message : '删除失败')
   }
   await refresh()
 }

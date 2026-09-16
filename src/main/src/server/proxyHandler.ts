@@ -1,14 +1,24 @@
+import { randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { findMapping } from '$/db/repo/modelRepo'
 import { errMsg, sendOpenAiError } from './httpRespond'
 import { buildForwardHeaders, collectExtraHeaders } from './forwardHeaders'
-import { addUsageQuietly, recordLocalLog, type TokenUsage } from './proxyLog'
+import {
+  addUsageQuietly,
+  recordLocalLog,
+  serializeRequestHeaders,
+  serializeResponseHeaders,
+  type TokenUsage
+} from './proxyLog'
 import { forwardConverted } from './protocol/convertHandler'
+import { joinChatCompletionsUrl, upstreamPathOf } from './protocol/upstreamUrl'
 
 interface PassResult {
   usage: TokenUsage | null
   /** 非 2xx 时截取的响应片段（记入日志 error 字段） */
   errorSnippet: string | null
+  /** 响应正文（流式为全部 SSE 文本），记入日志 responseBody */
+  resBody: string | null
 }
 
 /** 经 express.json 解析后的请求：转发层只依赖 body，不引入框架类型（避免与 fetch 的全局 Response 重名） */
@@ -16,28 +26,68 @@ type ProxyRequest = IncomingMessage & { body?: unknown }
 
 /** POST /v1/chat/completions：校验 body → 查映射 → 按提供商协议透传或转换 → 日志/用量落库 */
 export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Promise<void> {
+  const requestId = randomUUID()
   const startedAt = Date.now()
   const path = req.url ?? '/'
+  const reqHeaders = serializeRequestHeaders(req.headers)
 
   // express.json 已完成解析与 32MB 上限校验，此处只挡非对象 body（数组/标量）
   const parsed: unknown = req.body
   if (!isRecord(parsed)) {
-    sendOpenAiError(res, 400, 'Request body is not valid JSON')
+    const resBody = sendOpenAiError(res, 400, 'Request body is not valid JSON')
+    recordLocalLog({
+      path,
+      requestId,
+      publicModel: '-',
+      providerName: '-',
+      upstreamModel: '-',
+      startedAt,
+      status: 400,
+      stream: false,
+      usage: null,
+      error: 'invalid request body',
+      reqBody: null,
+      reqHeaders,
+      resBody,
+      resHeaders: null
+    })
     return
   }
-  const payload = parsed
+  const reqBody = JSON.stringify(parsed)
 
-  const publicModel = typeof payload['model'] === 'string' ? payload['model'] : ''
+  const publicModel = typeof parsed['model'] === 'string' ? parsed['model'] : ''
   if (!publicModel) {
-    sendOpenAiError(res, 400, "'model' is required")
+    const resBody = sendOpenAiError(res, 400, "'model' is required")
+    recordLocalLog({
+      path,
+      requestId,
+      publicModel: '-',
+      providerName: '-',
+      upstreamModel: '-',
+      startedAt,
+      status: 400,
+      stream: false,
+      usage: null,
+      error: "'model' is required",
+      reqBody,
+      reqHeaders,
+      resBody,
+      resHeaders: null
+    })
     return
   }
 
   const route = findMapping(publicModel)
   if (!route || !route.mappingEnabled || !route.providerEnabled) {
-    sendOpenAiError(res, 404, `The model '${publicModel}' does not exist`, 'model_not_found')
+    const resBody = sendOpenAiError(
+      res,
+      404,
+      `The model '${publicModel}' does not exist`,
+      'model_not_found'
+    )
     recordLocalLog({
       path,
+      requestId,
       publicModel,
       providerName: route?.providerName ?? '-',
       upstreamModel: route?.upstreamName ?? '-',
@@ -45,7 +95,11 @@ export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Pr
       status: 404,
       stream: false,
       usage: null,
-      error: 'model not found or disabled'
+      error: 'model not found or disabled',
+      reqBody,
+      reqHeaders,
+      resBody,
+      resHeaders: null
     })
     return
   }
@@ -57,51 +111,87 @@ export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Pr
       res,
       route,
       publicModel,
+      requestId,
       startedAt,
+      reqBody,
+      reqHeaders,
       extraHeaders: collectExtraHeaders(req)
     })
     return
   }
 
   // 同协议（OpenAI Chat 兼容）：纯透传，除 model 外全部原样保留
-  payload['model'] = route.upstreamName
+  parsed['model'] = route.upstreamName
 
   const controller = new AbortController()
   res.on('close', () => {
     if (!res.writableEnded) controller.abort()
   })
 
+  const upstreamUrl = joinChatCompletionsUrl(route.providerBaseUrl, path)
+  // 日志 path 记上游实际请求路径（而非客户端入口路径）
+  const logPath = upstreamPathOf(upstreamUrl)
+  const clientStream = parsed['stream'] === true
+
   let upstream: Response
   try {
-    upstream = await fetch(joinUpstreamUrl(route.providerBaseUrl, path), {
+    upstream = await fetch(upstreamUrl, {
       method: 'POST',
       headers: buildForwardHeaders(req, route),
-      body: JSON.stringify(payload),
+      body: JSON.stringify(parsed),
       signal: controller.signal
     })
   } catch (err) {
-    sendOpenAiError(res, 502, `Upstream request failed: ${errMsg(err)}`)
+    // signal 被 abort 只源于客户端断开：不回写，记 499（与转换路径一致）
+    if (controller.signal.aborted) {
+      res.destroy()
+      recordLocalLog({
+        path: logPath,
+        requestId,
+        publicModel,
+        providerName: route.providerName,
+        upstreamModel: route.upstreamName,
+        startedAt,
+        status: 499,
+        stream: clientStream,
+        usage: null,
+        error: 'client aborted',
+        reqBody,
+        reqHeaders,
+        resBody: null,
+        resHeaders: null
+      })
+      return
+    }
+    const resBody = sendOpenAiError(res, 502, `Upstream request failed: ${errMsg(err)}`)
     recordLocalLog({
-      path,
+      path: logPath,
+      requestId,
       publicModel,
       providerName: route.providerName,
       upstreamModel: route.upstreamName,
       startedAt,
       status: 502,
-      stream: false,
+      stream: clientStream,
       usage: null,
-      error: errMsg(err)
+      error: errMsg(err),
+      reqBody,
+      reqHeaders,
+      resBody,
+      resHeaders: null
     })
     return
   }
 
   const isStream = (upstream.headers.get('content-type') ?? '').includes('text/event-stream')
+  const resHeaders = serializeResponseHeaders(upstream.headers)
   const pass = isStream
     ? await pipeStreamResponse(upstream, res)
     : await bufferResponse(upstream, res)
 
   recordLocalLog({
-    path,
+    path: logPath,
+    requestId,
     publicModel,
     providerName: route.providerName,
     upstreamModel: route.upstreamName,
@@ -109,7 +199,11 @@ export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Pr
     status: upstream.status,
     stream: isStream,
     usage: pass.usage,
-    error: pass.errorSnippet
+    error: pass.errorSnippet,
+    reqBody,
+    reqHeaders,
+    resBody: pass.resBody,
+    resHeaders
   })
   // 用量只在请求成功时累加（失败请求 tokens 不可信）
   if (upstream.ok) {
@@ -120,6 +214,7 @@ export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Pr
 /** 非流式：读完上游 body 一次性返回 */
 async function bufferResponse(upstream: Response, res: ServerResponse): Promise<PassResult> {
   const buf = Buffer.from(await upstream.arrayBuffer())
+  const body = buf.toString('utf-8')
   if (!res.writableEnded && !res.destroyed) {
     res.writeHead(upstream.status, {
       'content-type': upstream.headers.get('content-type') ?? 'application/json'
@@ -127,12 +222,13 @@ async function bufferResponse(upstream: Response, res: ServerResponse): Promise<
     res.end(buf)
   }
   return {
-    usage: extractJsonUsage(buf),
-    errorSnippet: upstream.ok ? null : buf.toString('utf-8').slice(0, 500)
+    usage: extractJsonUsage(body),
+    errorSnippet: upstream.ok ? null : body.slice(0, 500),
+    resBody: body
   }
 }
 
-/** 流式：逐块回写（带背压），边透传边从 SSE data 行提取 usage */
+/** 流式：逐块回写（带背压），边透传边累积完整 SSE 文本并提取 usage */
 async function pipeStreamResponse(upstream: Response, res: ServerResponse): Promise<PassResult> {
   if (!res.writableEnded && !res.destroyed) {
     res.writeHead(upstream.status, {
@@ -146,12 +242,14 @@ async function pipeStreamResponse(upstream: Response, res: ServerResponse): Prom
     res.end()
     return {
       usage: null,
-      errorSnippet: upstream.ok ? 'empty upstream body' : 'upstream empty body'
+      errorSnippet: upstream.ok ? 'empty upstream body' : 'upstream empty body',
+      resBody: null
     }
   }
 
   const decoder = new TextDecoder()
   const feeder = createSseUsageFeeder()
+  const chunks: string[] = []
   let headText = ''
   try {
     for (;;) {
@@ -161,6 +259,7 @@ async function pipeStreamResponse(upstream: Response, res: ServerResponse): Prom
         await new Promise<void>((resolve) => res.once('drain', resolve))
       }
       const text = decoder.decode(value, { stream: true })
+      chunks.push(text)
       if (headText.length < 500) headText += text
       feeder.feed(text)
     }
@@ -171,13 +270,9 @@ async function pipeStreamResponse(upstream: Response, res: ServerResponse): Prom
   res.end()
   return {
     usage: feeder.flush(),
-    errorSnippet: upstream.ok ? null : headText.slice(0, 500)
+    errorSnippet: upstream.ok ? null : headText.slice(0, 500),
+    resBody: chunks.join('')
   }
-}
-
-function joinUpstreamUrl(baseUrl: string, requestPath: string): string {
-  const trimmed = baseUrl.replace(/\/+$/, '')
-  return requestPath.startsWith('/') ? `${trimmed}${requestPath}` : `${trimmed}/${requestPath}`
 }
 
 /** SSE usage 提取器：按完整行解析 data: 行，取最后一个非空 usage */
@@ -216,9 +311,9 @@ function createSseUsageFeeder(): { feed(text: string): void; flush(): TokenUsage
   }
 }
 
-function extractJsonUsage(buf: Buffer): TokenUsage | null {
+function extractJsonUsage(body: string): TokenUsage | null {
   try {
-    const parsed: unknown = JSON.parse(buf.toString('utf-8'))
+    const parsed: unknown = JSON.parse(body)
     if (isRecord(parsed) && parsed['usage'] != null) return normalizeUsage(parsed['usage'])
   } catch {
     // 响应体非 JSON，忽略
@@ -230,9 +325,22 @@ function normalizeUsage(raw: unknown): TokenUsage | null {
   if (!isRecord(raw)) return null
   const prompt = toCount(raw['prompt_tokens'])
   const completion = toCount(raw['completion_tokens'])
-  let total = toCount(raw['total_tokens'])
-  if (!total && (prompt || completion)) total = prompt + completion
-  return { promptTokens: prompt, completionTokens: completion, totalTokens: total }
+  const promptDetails = isRecord(raw['prompt_tokens_details']) ? raw['prompt_tokens_details'] : {}
+  const completionDetails = isRecord(raw['completion_tokens_details'])
+    ? raw['completion_tokens_details']
+    : {}
+  const usage: TokenUsage = {
+    promptTokens: prompt,
+    completionTokens: completion,
+    reasoningTokens:
+      toCount(completionDetails['reasoning_tokens']) || toCount(raw['reasoning_tokens']),
+    cacheReadTokens:
+      toCount(promptDetails['cached_tokens']) || toCount(raw['cache_read_input_tokens']),
+    cacheWriteTokens: toCount(raw['cache_creation_input_tokens']),
+    totalTokens: toCount(raw['total_tokens'])
+  }
+  if (!usage.totalTokens) usage.totalTokens = prompt + completion
+  return usage
 }
 
 function toCount(value: unknown): number {

@@ -28,7 +28,7 @@
           <div class="text-td-secondary text-13px mb-8px">今日 Tokens</div>
           <div class="text-28px font-600">{{ formatTokens(stats.totalTokens) }}</div>
           <div class="text-12px text-td-placeholder mt-4px">
-            输入 {{ formatTokens(stats.promptTokens) }} · 输出 {{ formatTokens(stats.completionTokens) }}
+            输入 {{ formatTokens(stats.promptTokens) }} · 输出 {{ formatTokens(stats.completionTokens) }} · 思考 {{ formatTokens(stats.reasoningTokens) }}
           </div>
         </div>
 
@@ -58,7 +58,16 @@ import PageLayout from '@/components/PageLayout/PageLayout.vue'
 const router = useRouter()
 
 const status = ref<ServiceStatus>({ state: 'stopped', port: 0 })
-const stats = ref<TodayStats>({ requestCount: 0, promptTokens: 0, completionTokens: 0, totalTokens: 0 })
+const stats = ref<TodayStats>({
+  requestCount: 0,
+  promptTokens: 0,
+  completionTokens: 0,
+  reasoningTokens: 0,
+  cacheReadTokens: 0,
+  cacheWriteTokens: 0,
+  unrecognizedTokens: 0,
+  totalTokens: 0
+})
 const providerTotal = ref(0)
 const providerEnabled = ref(0)
 const modelTotal = ref(0)

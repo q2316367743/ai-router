@@ -2,7 +2,7 @@ import { and, asc, gte, lte, sql } from 'drizzle-orm'
 import type { UsageDailyItem } from '@common/types'
 import { db } from '../client'
 import { usageDaily } from '../schema'
-import { todayKey } from '../../utils/date'
+import { todayKey } from '$/utils/date'
 
 export interface AddUsageParams {
   publicModel: string

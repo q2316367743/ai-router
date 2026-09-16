@@ -13,6 +13,7 @@ import {
   toTokenUsage
 } from './chatResponse'
 import { planUpstream } from './upstream'
+import { joinConvertUrl, upstreamPathOf } from './upstreamUrl'
 import type { AiFinishReason, ChatPrompt } from './types'
 
 /** streamText 返回结果类型（随 SDK 版本演进，避免手写泛型参数） */
@@ -24,11 +25,17 @@ interface ConvertOutcome {
   usage: TokenUsage | null
   errorSnippet: string | null
   ok: boolean
+  /** 实际下发给客户端的响应正文（流式为全部 SSE 文本） */
+  resBody: string | null
+  /** 上游响应标头（JSON 文本）；本地拦截无上游响应时为 null */
+  resHeaders: string | null
 }
 
 interface UpstreamFailure {
   status: number
   message: string
+  /** 上游错误响应标头（JSON 文本） */
+  resHeaders: string | null
 }
 
 /** 转换转发入参（extraHeaders：客户端自定义请求头，经 SDK headers 选项透传上游） */
@@ -37,7 +44,10 @@ export interface ForwardConvertedOptions {
   res: ServerResponse
   route: MappingRoute
   publicModel: string
+  requestId: string
   startedAt: number
+  reqBody: string | null
+  reqHeaders: string | null
   extraHeaders: Record<string, string>
 }
 
@@ -46,10 +56,13 @@ export interface ForwardConvertedOptions {
  * 请求侧解析为 ai-sdk 统一提示，响应侧把统一流重编码为 OpenAI Chat 线上格式（含 SSE）。
  */
 export async function forwardConverted(options: ForwardConvertedOptions): Promise<void> {
-  const { body, res, route, publicModel, startedAt, extraHeaders } = options
+  const { body, res, route, publicModel, requestId, startedAt, reqBody, reqHeaders, extraHeaders } = options
+  // 日志 path 记上游实际请求路径（而非客户端入口路径）
+  const logPath = upstreamPathOf(joinConvertUrl(route.providerBaseUrl, route.providerProtocol))
   const log = (outcome: ConvertOutcome): void => {
     recordLocalLog({
-      path: '/v1/chat/completions',
+      path: logPath,
+      requestId,
       publicModel,
       providerName: route.providerName,
       upstreamModel: route.upstreamName,
@@ -57,7 +70,11 @@ export async function forwardConverted(options: ForwardConvertedOptions): Promis
       status: outcome.status,
       stream: outcome.stream,
       usage: outcome.usage,
-      error: outcome.errorSnippet
+      error: outcome.errorSnippet,
+      reqBody,
+      reqHeaders,
+      resBody: outcome.resBody,
+      resHeaders: outcome.resHeaders
     })
     if (outcome.ok) addUsageQuietly(publicModel, outcome.usage)
   }
@@ -67,8 +84,8 @@ export async function forwardConverted(options: ForwardConvertedOptions): Promis
     prompt = parseChatPrompt(body)
   } catch (err) {
     const message = errMsg(err)
-    sendOpenAiError(res, 400, message)
-    log({ status: 400, stream: false, usage: null, errorSnippet: message, ok: false })
+    const resBody = sendOpenAiError(res, 400, message)
+    log({ status: 400, stream: false, usage: null, errorSnippet: message, ok: false, resBody, resHeaders: null })
     return
   }
 
@@ -98,8 +115,8 @@ export async function forwardConverted(options: ForwardConvertedOptions): Promis
     })
   } catch (err) {
     const message = `Invalid chat request: ${errMsg(err)}`
-    sendOpenAiError(res, 400, message)
-    log({ status: 400, stream: prompt.stream, usage: null, errorSnippet: message, ok: false })
+    const resBody = sendOpenAiError(res, 400, message)
+    log({ status: 400, stream: prompt.stream, usage: null, errorSnippet: message, ok: false, resBody, resHeaders: null })
     return
   }
 
@@ -158,16 +175,33 @@ async function streamToClient(
 
   if (aborted) {
     res.destroy()
-    return { status: 499, stream: true, usage: null, errorSnippet: 'client aborted', ok: false }
+    return {
+      status: 499,
+      stream: true,
+      usage: null,
+      errorSnippet: 'client aborted',
+      ok: false,
+      resBody: writer.dump() || null,
+      resHeaders: null
+    }
   }
   if (failed) {
+    let resBody: string | null
     if (writer.headWritten) {
-      await writer.errorMidStream(failed.message)
+      resBody = await writer.errorMidStream(failed.message)
       writer.end()
     } else {
-      sendOpenAiError(res, failed.status, failed.message)
+      resBody = sendOpenAiError(res, failed.status, failed.message)
     }
-    return { status: failed.status, stream: true, usage: null, errorSnippet: failed.message, ok: false }
+    return {
+      status: failed.status,
+      stream: true,
+      usage: null,
+      errorSnippet: failed.message,
+      ok: false,
+      resBody,
+      resHeaders: failed.resHeaders
+    }
   }
 
   let usage: LanguageModelUsage | undefined
@@ -185,7 +219,9 @@ async function streamToClient(
     stream: true,
     usage: usage ? toTokenUsage(usage) : null,
     errorSnippet: failed ? failed.message : null,
-    ok: !failed
+    ok: !failed,
+    resBody: writer.dump() || null,
+    resHeaders: failed ? failed.resHeaders : await upstreamResponseHeaders(result)
   }
 }
 
@@ -233,11 +269,19 @@ async function bufferToClient(
   }
 
   if (aborted) {
-    return { status: 499, stream: false, usage: null, errorSnippet: 'client aborted', ok: false }
+    return { status: 499, stream: false, usage: null, errorSnippet: 'client aborted', ok: false, resBody: null, resHeaders: null }
   }
   if (failed) {
-    sendOpenAiError(res, failed.status, failed.message)
-    return { status: failed.status, stream: false, usage: null, errorSnippet: failed.message, ok: false }
+    const resBody = sendOpenAiError(res, failed.status, failed.message)
+    return {
+      status: failed.status,
+      stream: false,
+      usage: null,
+      errorSnippet: failed.message,
+      ok: false,
+      resBody,
+      resHeaders: failed.resHeaders
+    }
   }
 
   let usage: LanguageModelUsage | undefined
@@ -245,10 +289,18 @@ async function bufferToClient(
     usage = await result.usage
   } catch (err) {
     failed = toUpstreamError(err)
-    sendOpenAiError(res, failed.status, failed.message)
-    return { status: failed.status, stream: false, usage: null, errorSnippet: failed.message, ok: false }
+    const resBody = sendOpenAiError(res, failed.status, failed.message)
+    return {
+      status: failed.status,
+      stream: false,
+      usage: null,
+      errorSnippet: failed.message,
+      ok: false,
+      resBody,
+      resHeaders: failed.resHeaders
+    }
   }
-  sendChatCompletion(res, {
+  const resBody = sendChatCompletion(res, {
     model: publicModel,
     content: text || null,
     reasoning,
@@ -256,16 +308,38 @@ async function bufferToClient(
     finishReason: mapFinishReason(finishReason ?? 'stop'),
     usage: toChatUsage(usage)
   })
-  return { status: 200, stream: false, usage: toTokenUsage(usage), errorSnippet: null, ok: true }
+  return {
+    status: 200,
+    stream: false,
+    usage: toTokenUsage(usage),
+    errorSnippet: null,
+    ok: true,
+    resBody,
+    resHeaders: await upstreamResponseHeaders(result)
+  }
 }
 
 /** 上游错误 → 客户端状态码与消息（ai-sdk 网络错误带 statusCode，其余按 502 处理） */
 function toUpstreamError(err: unknown): UpstreamFailure {
   if (APICallError.isInstance(err)) {
     const body = typeof err.responseBody === 'string' && err.responseBody ? `: ${err.responseBody.slice(0, 300)}` : ''
-    return { status: err.statusCode ?? 502, message: `${err.message}${body}` }
+    return {
+      status: err.statusCode ?? 502,
+      message: `${err.message}${body}`,
+      resHeaders: err.responseHeaders ? JSON.stringify(err.responseHeaders) : null
+    }
   }
-  return { status: 502, message: `Upstream request failed: ${errMsg(err)}` }
+  return { status: 502, message: `Upstream request failed: ${errMsg(err)}`, resHeaders: null }
+}
+
+/** 成功响应的上游响应标头（JSON 文本；SDK 未返回或为空时为 null） */
+async function upstreamResponseHeaders(result: ChatStreamResult): Promise<string | null> {
+  try {
+    const headers = (await result.response).headers
+    return headers && Object.keys(headers).length > 0 ? JSON.stringify(headers) : null
+  } catch {
+    return null
+  }
 }
 
 /** 工具调用入参序列化：对象转 JSON 字符串，字符串视为已是 JSON 文本 */

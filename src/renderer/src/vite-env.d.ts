@@ -1,11 +1,14 @@
 /// <reference types="vite/client" />
 import type { ElectronAPI } from '@electron-toolkit/preload'
 import type {
+  LogFilterOptions,
+  LogListQuery,
+  LogListResult,
   ModelMappingInfo,
   ModelMappingInput,
   ProviderInfo,
   ProviderInput,
-  RequestLogItem,
+  RequestLogDetail,
   ServiceConfig,
   ServiceStatus,
   TodayStats,
@@ -44,8 +47,14 @@ declare global {
         onStatusChanged(cb: (status: ServiceStatus) => void): () => void
       }
       log: {
-        listToday(): Promise<RequestLogItem[]>
-        clear(): Promise<void>
+        /** 按条件（状态/供应商/模型）分页查询日志列表（轻量字段，不含正文与标头） */
+        list(query: LogListQuery): Promise<LogListResult>
+        /** 列表筛选项：日志中去重后的供应商 / 请求模型 */
+        filterOptions(): Promise<LogFilterOptions>
+        /** 按查询单条日志全量详情（含正文与标头） */
+        getDetail(id: number): Promise<RequestLogDetail | null>
+        /** 清空全部日志（保留窗口内） */
+        clearAll(): Promise<void>
         todayStats(): Promise<TodayStats>
       }
       usage: {

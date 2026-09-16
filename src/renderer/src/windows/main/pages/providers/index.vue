@@ -21,10 +21,16 @@
           <t-tag variant="outline" size="small">{{ row.modelCount }}</t-tag>
         </template>
         <template #enabled="{ row }">
-          <t-switch :value="row.enabled" size="small" @change="(v: unknown) => toggleEnabled(row, v === true)" />
+          <t-switch
+            :value="row.enabled"
+            size="small"
+            @change="(v: unknown) => toggleEnabled(row, v === true)"
+          />
         </template>
         <template #op="{ row }">
-          <t-button variant="text" size="small" theme="primary" @click="openEdit(row)">编辑</t-button>
+          <t-button variant="text" size="small" theme="primary" @click="openEdit(row)"
+            >编辑</t-button
+          >
           <t-popconfirm content="删除提供商将一并删除其模型映射，确定删除？" @confirm="remove(row)">
             <t-button variant="text" size="small" theme="danger">删除</t-button>
           </t-popconfirm>
@@ -35,17 +41,19 @@
 </template>
 
 <script lang="ts" setup>
-import { onMounted, ref } from 'vue'
 import type { ProviderInfo, ProviderProtocol } from '@common/types'
-import { MessagePlugin } from 'tdesign-vue-next'
 import { maskKey } from '@/utils/format'
 import PageLayout from '@/components/PageLayout/PageLayout.vue'
 import { openProviderDialog } from './modals/ProviderDialog'
+import { MessageUtil } from '@/utils/modal'
 
 const list = ref<ProviderInfo[]>([])
 const loading = ref(false)
 
-const PROTOCOL_META: Record<ProviderProtocol, { label: string; theme: 'default' | 'primary' | 'success' }> = {
+const PROTOCOL_META: Record<
+  ProviderProtocol,
+  { label: string; theme: 'default' | 'primary' | 'success' }
+> = {
   openai: { label: 'OpenAI Chat', theme: 'default' },
   'openai-responses': { label: 'OpenAI Responses', theme: 'primary' },
   anthropic: { label: 'Anthropic', theme: 'success' }
@@ -83,16 +91,16 @@ async function toggleEnabled(row: ProviderInfo, enabled: boolean): Promise<void>
     await window.preload.provider.update({ ...row, enabled })
     row.enabled = enabled
   } catch (err) {
-    MessagePlugin.error(err instanceof Error ? err.message : '操作失败')
+    MessageUtil.error(err instanceof Error ? err.message : '操作失败')
   }
 }
 
 async function remove(row: ProviderInfo): Promise<void> {
   try {
     await window.preload.provider.remove(row.id)
-    MessagePlugin.success('已删除')
+    MessageUtil.success('已删除')
   } catch (err) {
-    MessagePlugin.error(err instanceof Error ? err.message : '删除失败')
+    MessageUtil.error(err instanceof Error ? err.message : '删除失败')
   }
   await refresh()
 }
