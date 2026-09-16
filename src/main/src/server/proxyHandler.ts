@@ -5,7 +5,7 @@ import { errMsg, sendOpenAiError } from './httpRespond'
 import { buildForwardHeaders, collectExtraHeaders } from './forwardHeaders'
 import {
   recordRequest,
-  serializeRequestHeaders,
+  serializeOutboundHeaders,
   serializeResponseHeaders,
   startRequest,
   type TokenUsage
@@ -29,7 +29,6 @@ export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Pr
   const requestId = randomUUID()
   const startedAt = Date.now()
   const path = req.url ?? '/'
-  const reqHeaders = serializeRequestHeaders(req.headers)
 
   // express.json 已完成解析与 32MB 上限校验，此处只挡非对象 body（数组/标量）
   const parsed: unknown = req.body
@@ -47,13 +46,12 @@ export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Pr
       usage: null,
       error: 'invalid request body',
       reqBody: null,
-      reqHeaders,
+      reqHeaders: null,
       resBody,
       resHeaders: null
     })
     return
   }
-  const reqBody = JSON.stringify(parsed)
 
   const publicModel = typeof parsed['model'] === 'string' ? parsed['model'] : ''
   if (!publicModel) {
@@ -69,8 +67,9 @@ export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Pr
       stream: false,
       usage: null,
       error: "'model' is required",
-      reqBody,
-      reqHeaders,
+      // 日志为线上口径：未向提供商发起请求，出站请求侧记 null
+      reqBody: null,
+      reqHeaders: null,
       resBody,
       resHeaders: null
     })
@@ -96,8 +95,8 @@ export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Pr
       stream: false,
       usage: null,
       error: 'model not found or disabled',
-      reqBody,
-      reqHeaders,
+      reqBody: null,
+      reqHeaders: null,
       resBody,
       resHeaders: null
     })
@@ -113,8 +112,6 @@ export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Pr
       publicModel,
       requestId,
       startedAt,
-      reqBody,
-      reqHeaders,
       extraHeaders: collectExtraHeaders(req)
     })
     return
@@ -133,6 +130,11 @@ export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Pr
   const logPath = upstreamPathOf(upstreamUrl)
   const clientStream = parsed['stream'] === true
 
+  // 线上口径：日志记录实际发给提供商的正文与标头（标头入库前脱敏）
+  const forwardBody = JSON.stringify(parsed)
+  const forwardHeaders = buildForwardHeaders(req, route)
+  const forwardHeadersJson = serializeOutboundHeaders(forwardHeaders)
+
   // 转发前先落 pending 日志（日志页即时可见「进行中」）；stream 先按客户端意愿预估，
   // 结束时以实际上游 content-type 判定值回填
   startRequest({
@@ -143,16 +145,16 @@ export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Pr
     upstreamModel: route.upstreamName,
     path: logPath,
     stream: clientStream,
-    requestBody: reqBody,
-    requestHeaders: reqHeaders
+    requestBody: forwardBody,
+    requestHeaders: forwardHeadersJson
   })
 
   let upstream: Response
   try {
     upstream = await fetch(upstreamUrl, {
       method: 'POST',
-      headers: buildForwardHeaders(req, route),
-      body: JSON.stringify(parsed),
+      headers: forwardHeaders,
+      body: forwardBody,
       signal: controller.signal
     })
   } catch (err) {
@@ -170,8 +172,8 @@ export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Pr
         stream: clientStream,
         usage: null,
         error: 'client aborted',
-        reqBody,
-        reqHeaders,
+        reqBody: forwardBody,
+        reqHeaders: forwardHeadersJson,
         resBody: null,
         resHeaders: null
       })
@@ -189,8 +191,8 @@ export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Pr
       stream: clientStream,
       usage: null,
       error: errMsg(err),
-      reqBody,
-      reqHeaders,
+      reqBody: forwardBody,
+      reqHeaders: forwardHeadersJson,
       resBody,
       resHeaders: null
     })
@@ -214,8 +216,8 @@ export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Pr
     stream: isStream,
     usage: pass.usage,
     error: pass.errorSnippet,
-    reqBody,
-    reqHeaders,
+    reqBody: forwardBody,
+    reqHeaders: forwardHeadersJson,
     resBody: pass.resBody,
     resHeaders
   })

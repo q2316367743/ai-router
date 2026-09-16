@@ -1,6 +1,7 @@
 import { app, BrowserWindow } from 'electron'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
-import { createMainWindow } from '$/app/mainWindow'
+import { isOpenedAtLogin } from '$/app/autoLaunch'
+import { createMainWindow, showMainWindow } from '$/app/mainWindow'
 import { registerAppTray } from '$/app/tray'
 import { initDb } from '$/db/client'
 import { cleanupLogsOnStartup } from '$/ipc/logIpc'
@@ -36,16 +37,24 @@ if (hasSingleInstanceLock) {
     // 启动本地代理服务（未启用时仅更新状态）
     await startProxyServer()
 
-    // 创建主窗口
-    createMainWindow()
-
     // 注册系统托盘（macOS 标题实时显示今日用量）
     registerAppTray()
+
+    if (isOpenedAtLogin()) {
+      // 开机自启：静默驻留托盘，仅代理服务后台运行；macOS 同步隐藏 Dock
+      if (process.platform === 'darwin') app.dock?.hide()
+    } else {
+      // 创建主窗口
+      createMainWindow()
+    }
 
     // macOS 点击 Dock：无窗口时重建
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createMainWindow()
     })
+
+    // 二次启动（如静默驻留托盘时再次打开应用）：唤出主窗口，避免无任何反馈
+    app.on('second-instance', () => showMainWindow())
   })
 
   app.on('will-quit', () => {

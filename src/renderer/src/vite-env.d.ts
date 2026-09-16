@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 import type { ElectronAPI } from '@electron-toolkit/preload'
 import type {
+  AutoLaunchState,
   LogFilterOptions,
   LogListQuery,
   LogListResult,
@@ -24,6 +25,12 @@ declare global {
     electron: ElectronAPI
     /** 业务桥：各域 API 在 src/preload/src/modules/<域>/ 实现后于 preload/index.ts 组装 */
     preload: {
+      app: {
+        /** 读取开机自启状态（以操作系统登录项为权威） */
+        getAutoLaunch(): Promise<AutoLaunchState>
+        /** 设置开机自启，返回回读后的真实状态 */
+        setAutoLaunch(enabled: boolean): Promise<AutoLaunchState>
+      }
       db: {
         /** 探活数据库连接（main 执行 SELECT 1） */
         ping(): Promise<boolean>

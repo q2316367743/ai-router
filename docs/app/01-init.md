@@ -38,6 +38,7 @@ src/
 3. **数据库**：DB 文件 `~/.ai-router/db/ai-router.db`（WAL + 外键）；表结构写在 `src/main/src/db/schema/`，`npx drizzle-kit generate` 输出到 `resources/drizzle/`（electron-vite main publicDir，打包时 asarUnpack）；运行时 `client.ts` 经 `__dirname/../../resources/drizzle` 解析并 `migrate()`，迁移目录不存在时跳过（防空库崩溃）。
 4. **跨进程链路示例（db:ping）**：`window.preload.db.ping()` → `preload/src/modules/db/db.ts`（`ipcRenderer.invoke('db:ping')`）→ `main/src/db/dbIpc.ts`（`db().run(sql`SELECT 1`)`）。新域照此四步：桥 → 组装 → 契约类型 → main handler 注册。
 5. **窗口标题栏**：无边框（hiddenInset / titleBarOverlay），`App.vue` 顶部有 `.window-drag-region`（38px 拖拽区），业务页面布局需避开顶部 38px。
-6. **深浅色**：UnoCSS `dark: 'class'`（html.dark）+ TDesign `theme-mode` 属性，统一经 `useAppStore().toggleTheme()` 切换。
-7. **dev 端口**：7744（mistrelle 为 7743，错开便于同开）。
-8. **脚手架引导**：首次初始化执行过 `npx electron-vite build` + `npx drizzle-kit generate`（空 schema 初始迁移）；日常开发按 AGENTS.md RL-07 只跑 typecheck。
+6. **macOS Dock 跟随主窗口**（2026-09-16）：Dock 图标仅在主窗口可见时显示（`mainWindow.ts` 的 `syncDock`：darwin 限定，按 `app.dock.isVisible()` 去重），挂载点覆盖 `createMainWindow` 开头（启动时窗口 `show:false` 先隐藏，防闪烁）、`ready-to-show` / `showMainWindow`（先 `dock.show()` 再 `win.show()`，顺序颠倒窗口无法激活前置）、`hide` / `closed`（隐藏 Dock）。托盘统计面板（trayPanel 窗口）不参与 Dock 判断；关闭主窗口仍是销毁行为，托盘菜单「打开主窗口」可重开并恢复 Dock。
+7. **深浅色**：UnoCSS `dark: 'class'`（html.dark）+ TDesign `theme-mode` 属性，统一经 `useAppStore().toggleTheme()` 切换。
+8. **dev 端口**：7744（mistrelle 为 7743，错开便于同开）。
+9. **脚手架引导**：首次初始化执行过 `npx electron-vite build` + `npx drizzle-kit generate`（空 schema 初始迁移）；日常开发按 AGENTS.md RL-07 只跑 typecheck。

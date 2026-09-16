@@ -15,7 +15,12 @@
 
     <div class="px-24px">
       <div class="flex items-center gap-12px mb-12px">
-        <t-radio-group :value="status" variant="outline" size="small" @change="onStatusChange">
+        <t-radio-group
+          :value="status"
+          variant="outline"
+          size="small"
+          @change="onStatusChange"
+        >
           <t-radio-button value="all">全部</t-radio-button>
           <t-radio-button value="success">成功</t-radio-button>
           <t-radio-button value="fail">失败</t-radio-button>
@@ -26,7 +31,7 @@
           placeholder="全部供应商"
           clearable
           size="small"
-          class="w-180px"
+          style="width: 180px"
         />
         <t-select
           v-model="model"
@@ -34,7 +39,7 @@
           placeholder="全部模型"
           clearable
           size="small"
-          class="w-180px"
+          style="width: 180px"
         />
       </div>
 
@@ -109,7 +114,13 @@
 <script lang="ts" setup>
 import type { PageInfo } from 'tdesign-vue-next'
 import type { LogStatusFilter, RequestLogItem } from '@common/types'
-import { formatDateTime, formatDuration, formatTokens, isPendingStatus, isSuccessStatus } from '@/utils/format'
+import {
+  formatDateTime,
+  formatDuration,
+  formatTokens,
+  isPendingStatus,
+  isSuccessStatus
+} from '@/utils/format'
 import PageLayout from '@/components/PageLayout/PageLayout.vue'
 import LogExpandedRow from './components/LogExpandedRow.vue'
 import { useLogRefresh } from './useLogRefresh'

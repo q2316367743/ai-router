@@ -5,8 +5,9 @@
  * - win32 ：hidden + titleBarOverlay（原生控制按钮）+ acrylic 毛玻璃 + 透明背景让其生效
  * - linux ：hidden + titleBarOverlay + 实色背景（无毛玻璃能力）
  * 渲染层对应在 App.vue 顶部放置 .window-drag-region 拖拽区。
+ * macOS Dock 跟随主窗口可见性（显示才显示 Dock，隐藏/关闭即隐藏），托盘面板不参与。
  */
-import { BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, shell } from 'electron'
 import type { BrowserWindowConstructorOptions } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
@@ -55,19 +56,38 @@ function windowOptions(): BrowserWindowConstructorOptions {
 
 let mainWindow: BrowserWindow | null = null
 
+/**
+ * macOS Dock 跟随主窗口可见性：主窗口显示才显示 Dock，隐藏/关闭即隐藏。
+ * 托盘面板窗口不参与判断。必须在 ready 之后调用（createMainWindow 由 whenReady 触发）。
+ */
+function syncDock(visible: boolean): void {
+  if (process.platform !== 'darwin' || !app.dock) return
+  if (visible === app.dock.isVisible()) return
+  if (visible) app.dock.show()
+  else app.dock.hide()
+}
+
 /** 创建并加载主窗口（已存在则直接返回） */
 export function createMainWindow(): BrowserWindow {
   if (mainWindow) return mainWindow
 
+  // 启动时窗口尚未显示，先隐藏 Dock，避免启动瞬间图标闪烁
+  syncDock(false)
+
   mainWindow = new BrowserWindow(windowOptions())
 
   mainWindow.on('ready-to-show', () => {
+    // 必须先恢复 Dock 再 show，否则窗口无法正常激活前置
+    syncDock(true)
     mainWindow?.show()
   })
+
+  mainWindow.on('hide', () => syncDock(false))
 
   // 关窗后置空，避免残留已销毁实例（托盘/Dock 重开依赖）
   mainWindow.on('closed', () => {
     mainWindow = null
+    syncDock(false)
   })
 
   // 外部链接交给系统浏览器打开
@@ -88,6 +108,7 @@ export function createMainWindow(): BrowserWindow {
 /** 显示主窗口：存活则前置聚焦，已关闭则重建 */
 export function showMainWindow(): void {
   if (mainWindow && !mainWindow.isDestroyed()) {
+    syncDock(true)
     mainWindow.show()
     mainWindow.focus()
     return

@@ -3,7 +3,7 @@ import express, { type Express, type NextFunction, type Request, type Response }
 import { listModelMappings } from '$/db/repo/modelRepo'
 import { getServiceConfig } from '$/db/repo/settingRepo'
 import { errMsg, sendJson, sendOpenAiError } from './httpRespond'
-import { recordRequest, serializeRequestHeaders } from './proxyLog'
+import { recordRequest } from './proxyLog'
 import { forwardRequest } from './proxyHandler'
 
 /** 请求体上限：32MB，防异常大包拖垮内存 */
@@ -52,8 +52,9 @@ export function createProxyApp(): Express {
       stream: false,
       usage: null,
       error: 'invalid api key',
+      // 未向提供商发起请求（线上口径请求侧为 null）；客户端鉴权头本就在脱敏剔除之列，无入库价值
       reqBody: null,
-      reqHeaders: serializeRequestHeaders(req.headers),
+      reqHeaders: null,
       resBody,
       resHeaders: null
     })

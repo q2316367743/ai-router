@@ -1,4 +1,3 @@
-import type { IncomingHttpHeaders } from 'node:http'
 import { recordLog, startLog, type RequestLogStart } from '$/db/repo/logRepo'
 import { accumulateUsage } from '$/db/repo/usageRepo'
 import { refreshTrayUsage } from '$/app/tray'
@@ -24,13 +23,13 @@ export interface ProxyLogEntry {
   stream: boolean
   usage: TokenUsage | null
   error: string | null
-  /** 请求正文（JSON 文本）；本地拦截拿不到 body 时为 null */
+  /** 出站请求正文（实际发给提供商的 JSON 文本；未发起上游请求时为 null） */
   reqBody: string | null
-  /** 请求标头（脱敏后的 JSON 文本） */
+  /** 出站请求标头（脱敏后的 JSON 文本；未发起上游请求时为 null） */
   reqHeaders: string | null
-  /** 响应正文（非流式 JSON 文本；流式为全部 SSE 文本；无上游响应时为 null） */
+  /** 响应正文（提供商返回：非流式 JSON 文本 / 流式全部 SSE 文本；无上游响应时为 null） */
   resBody: string | null
-  /** 响应标头（上游响应头 JSON 文本；本地拦截无上游响应时为 null） */
+  /** 响应标头（提供商响应头 JSON 文本；无上游响应时为 null） */
   resHeaders: string | null
 }
 
@@ -124,7 +123,7 @@ const SENSITIVE_REQ_HEADERS: ReadonlySet<string> = new Set(['authorization', 'x-
 const SENSITIVE_RES_HEADERS: ReadonlySet<string> = new Set(['set-cookie'])
 
 /** 请求标头序列化入库（JSON 文本；剔除鉴权字段；无有效字段返回 null） */
-export function serializeRequestHeaders(headers: IncomingHttpHeaders): string | null {
+export function serializeOutboundHeaders(headers: Record<string, string>): string | null {
   return stringifyHeaders(headers, SENSITIVE_REQ_HEADERS)
 }
 

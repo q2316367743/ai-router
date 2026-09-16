@@ -88,18 +88,15 @@ export interface ChunkWriter {
   /** 兜底：上游未发出 input-start/delta 时直接下发完整工具调用 */
   toolCallComplete(id: string, name: string, argsJson: string): Promise<void>
   finish(reason: ChatFinishReason, usage: ChatUsage): Promise<void>
-  /** 流已开始后中途出错：以 OpenAI 流内 error 块收尾，返回写出的正文文本 */
-  errorMidStream(message: string): Promise<string | null>
+  /** 流已开始后中途出错：以 OpenAI 流内 error 块收尾 */
+  errorMidStream(message: string): Promise<void>
   end(): void
-  /** 实际下发给客户端的全部 SSE 文本（日志响应正文） */
-  dump(): string
 }
 
 export function createChunkWriter(res: ServerResponse, model: string): ChunkWriter {
   const id = makeCompletionId()
   const created = Math.floor(Date.now() / 1000)
   const toolIndexes = new Map<string, number>()
-  const captured: string[] = []
   let nextIndex = 0
   let headWritten = false
 
@@ -134,9 +131,8 @@ export function createChunkWriter(res: ServerResponse, model: string): ChunkWrit
     await write(`data: ${JSON.stringify(chunk)}\n\n`)
   }
 
-  /** 写出并记录（背压等待 drain），记录内容供日志响应正文使用 */
+  /** 写出（背压等待 drain） */
   const write = async (line: string): Promise<void> => {
-    captured.push(line)
     if (!res.write(line)) {
       await new Promise<void>((resolve) => res.once('drain', resolve))
     }
@@ -189,19 +185,16 @@ export function createChunkWriter(res: ServerResponse, model: string): ChunkWrit
       if (!res.writableEnded && !res.destroyed) await write(`data: ${JSON.stringify(tail)}\n\n`)
     },
     errorMidStream: async (message) => {
-      if (res.writableEnded || res.destroyed) return null
+      if (res.writableEnded || res.destroyed) return
       const line = `data: ${JSON.stringify({ error: { message, type: 'api_error', code: null } })}\n\n`
       await write(line)
-      return line
     },
     end: () => {
       if (!res.writableEnded && !res.destroyed) {
-        captured.push('data: [DONE]\n\n')
         res.write('data: [DONE]\n\n')
         res.end()
       }
-    },
-    dump: () => captured.join('')
+    }
   }
 }
 

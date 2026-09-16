@@ -13,6 +13,7 @@ import {
   toTokenUsage
 } from './chatResponse'
 import { planUpstream } from './upstream'
+import { createWireCapture } from './wireCapture'
 import { joinConvertUrl, upstreamPathOf } from './upstreamUrl'
 import type { AiFinishReason, ChatPrompt } from './types'
 
@@ -25,17 +26,13 @@ interface ConvertOutcome {
   usage: TokenUsage | null
   errorSnippet: string | null
   ok: boolean
-  /** 实际下发给客户端的响应正文（流式为全部 SSE 文本） */
-  resBody: string | null
-  /** 上游响应标头（JSON 文本）；本地拦截无上游响应时为 null */
-  resHeaders: string | null
+  /** 本地生成的响应正文（拦截分支的 OpenAI 错误 JSON）；有上游响应时日志取线上捕获 */
+  localResBody: string | null
 }
 
 interface UpstreamFailure {
   status: number
   message: string
-  /** 上游错误响应标头（JSON 文本） */
-  resHeaders: string | null
 }
 
 /** 转换转发入参（extraHeaders：客户端自定义请求头，经 SDK headers 选项透传上游） */
@@ -46,21 +43,21 @@ export interface ForwardConvertedOptions {
   publicModel: string
   requestId: string
   startedAt: number
-  reqBody: string | null
-  reqHeaders: string | null
   extraHeaders: Record<string, string>
 }
 
 /**
  * 转换转发：客户端为 OpenAI Chat 协议，上游为 anthropic / openai-responses。
  * 请求侧解析为 ai-sdk 统一提示，响应侧把统一流重编码为 OpenAI Chat 线上格式（含 SSE）。
+ * 日志为线上口径：经 wireCapture 记录实际发给提供商的请求与提供商返回的原始响应。
  */
 export async function forwardConverted(options: ForwardConvertedOptions): Promise<void> {
-  const { body, res, route, publicModel, requestId, startedAt, reqBody, reqHeaders, extraHeaders } = options
+  const { body, res, route, publicModel, requestId, startedAt, extraHeaders } = options
   // 日志 path 记上游实际请求路径（而非客户端入口路径）
   const logPath = upstreamPathOf(joinConvertUrl(route.providerBaseUrl, route.providerProtocol))
   // 转发前先落 pending 日志（日志页即时可见「进行中」）；stream 由原始 body 判定，
-  // 与请求解析成败无关，结束时以实际下发形态回填
+  // 与请求解析成败无关，结束时以实际下发形态回填。出站报文由 SDK 惰性生成，
+  // 此时不可知，pending 行先空、结束时经 capture 回填
   startRequest({
     requestId,
     startedAt,
@@ -68,10 +65,9 @@ export async function forwardConverted(options: ForwardConvertedOptions): Promis
     providerName: route.providerName,
     upstreamModel: route.upstreamName,
     path: logPath,
-    stream: isRecord(body) && body['stream'] === true,
-    requestBody: reqBody,
-    requestHeaders: reqHeaders
+    stream: isRecord(body) && body['stream'] === true
   })
+  const { fetch: captureFetch, capture } = createWireCapture()
   const log = (outcome: ConvertOutcome): void => {
     recordRequest({
       path: logPath,
@@ -84,10 +80,10 @@ export async function forwardConverted(options: ForwardConvertedOptions): Promis
       stream: outcome.stream,
       usage: outcome.usage,
       error: outcome.errorSnippet,
-      reqBody,
-      reqHeaders,
-      resBody: outcome.resBody,
-      resHeaders: outcome.resHeaders
+      reqBody: capture.requestBody,
+      reqHeaders: capture.requestHeaders,
+      resBody: capture.responseBody ?? outcome.localResBody,
+      resHeaders: capture.responseHeaders
     })
   }
 
@@ -96,12 +92,25 @@ export async function forwardConverted(options: ForwardConvertedOptions): Promis
     prompt = parseChatPrompt(body)
   } catch (err) {
     const message = errMsg(err)
-    const resBody = sendOpenAiError(res, 400, message)
-    log({ status: 400, stream: false, usage: null, errorSnippet: message, ok: false, resBody, resHeaders: null })
+    const localResBody = sendOpenAiError(res, 400, message)
+    log({
+      status: 400,
+      stream: false,
+      usage: null,
+      errorSnippet: message,
+      ok: false,
+      localResBody
+    })
     return
   }
 
-  const plan = planUpstream(route, prompt.reasoningEffort, prompt.maxOutputTokens, extraHeaders)
+  const plan = planUpstream(
+    route,
+    prompt.reasoningEffort,
+    prompt.maxOutputTokens,
+    extraHeaders,
+    captureFetch
+  )
   const controller = new AbortController()
   res.on('close', () => {
     if (!res.writableEnded) controller.abort()
@@ -127,8 +136,15 @@ export async function forwardConverted(options: ForwardConvertedOptions): Promis
     })
   } catch (err) {
     const message = `Invalid chat request: ${errMsg(err)}`
-    const resBody = sendOpenAiError(res, 400, message)
-    log({ status: 400, stream: prompt.stream, usage: null, errorSnippet: message, ok: false, resBody, resHeaders: null })
+    const localResBody = sendOpenAiError(res, 400, message)
+    log({
+      status: 400,
+      stream: prompt.stream,
+      usage: null,
+      errorSnippet: message,
+      ok: false,
+      localResBody
+    })
     return
   }
 
@@ -193,17 +209,16 @@ async function streamToClient(
       usage: null,
       errorSnippet: 'client aborted',
       ok: false,
-      resBody: writer.dump() || null,
-      resHeaders: null
+      // 日志响应正文取线上捕获（中断前的原始 SSE 片段），与本地下发内容无关
+      localResBody: null
     }
   }
   if (failed) {
-    let resBody: string | null
     if (writer.headWritten) {
-      resBody = await writer.errorMidStream(failed.message)
+      await writer.errorMidStream(failed.message)
       writer.end()
     } else {
-      resBody = sendOpenAiError(res, failed.status, failed.message)
+      sendOpenAiError(res, failed.status, failed.message)
     }
     return {
       status: failed.status,
@@ -211,15 +226,17 @@ async function streamToClient(
       usage: null,
       errorSnippet: failed.message,
       ok: false,
-      resBody,
-      resHeaders: failed.resHeaders
+      localResBody: null
     }
   }
 
   let usage: LanguageModelUsage | undefined
   try {
     usage = await result.usage
-    await writer.finish(mapFinishReason(finishReason ?? (await result.finishReason)), toChatUsage(usage))
+    await writer.finish(
+      mapFinishReason(finishReason ?? (await result.finishReason)),
+      toChatUsage(usage)
+    )
   } catch (err) {
     // usage/finishReason 收尾失败不掩盖已下发正文，以流内错误块收尾
     failed = toUpstreamError(err)
@@ -232,8 +249,7 @@ async function streamToClient(
     usage: usage ? toTokenUsage(usage) : null,
     errorSnippet: failed ? failed.message : null,
     ok: !failed,
-    resBody: writer.dump() || null,
-    resHeaders: failed ? failed.resHeaders : await upstreamResponseHeaders(result)
+    localResBody: null
   }
 }
 
@@ -260,7 +276,11 @@ async function bufferToClient(
           reasoning += part.text
           break
         case 'tool-call':
-          toolCalls.push({ id: part.toolCallId, name: part.toolName, argsJson: stableJson(part.input) })
+          toolCalls.push({
+            id: part.toolCallId,
+            name: part.toolName,
+            argsJson: stableJson(part.input)
+          })
           break
         case 'finish':
           finishReason = part.finishReason
@@ -281,18 +301,24 @@ async function bufferToClient(
   }
 
   if (aborted) {
-    return { status: 499, stream: false, usage: null, errorSnippet: 'client aborted', ok: false, resBody: null, resHeaders: null }
+    return {
+      status: 499,
+      stream: false,
+      usage: null,
+      errorSnippet: 'client aborted',
+      ok: false,
+      localResBody: null
+    }
   }
   if (failed) {
-    const resBody = sendOpenAiError(res, failed.status, failed.message)
+    sendOpenAiError(res, failed.status, failed.message)
     return {
       status: failed.status,
       stream: false,
       usage: null,
       errorSnippet: failed.message,
       ok: false,
-      resBody,
-      resHeaders: failed.resHeaders
+      localResBody: null
     }
   }
 
@@ -301,18 +327,17 @@ async function bufferToClient(
     usage = await result.usage
   } catch (err) {
     failed = toUpstreamError(err)
-    const resBody = sendOpenAiError(res, failed.status, failed.message)
+    const localResBody = sendOpenAiError(res, failed.status, failed.message)
     return {
       status: failed.status,
       stream: false,
       usage: null,
       errorSnippet: failed.message,
       ok: false,
-      resBody,
-      resHeaders: failed.resHeaders
+      localResBody
     }
   }
-  const resBody = sendChatCompletion(res, {
+  sendChatCompletion(res, {
     model: publicModel,
     content: text || null,
     reasoning,
@@ -326,32 +351,23 @@ async function bufferToClient(
     usage: toTokenUsage(usage),
     errorSnippet: null,
     ok: true,
-    resBody,
-    resHeaders: await upstreamResponseHeaders(result)
+    localResBody: null
   }
 }
 
 /** 上游错误 → 客户端状态码与消息（ai-sdk 网络错误带 statusCode，其余按 502 处理） */
 function toUpstreamError(err: unknown): UpstreamFailure {
   if (APICallError.isInstance(err)) {
-    const body = typeof err.responseBody === 'string' && err.responseBody ? `: ${err.responseBody.slice(0, 300)}` : ''
+    const body =
+      typeof err.responseBody === 'string' && err.responseBody
+        ? `: ${err.responseBody.slice(0, 300)}`
+        : ''
     return {
       status: err.statusCode ?? 502,
-      message: `${err.message}${body}`,
-      resHeaders: err.responseHeaders ? JSON.stringify(err.responseHeaders) : null
+      message: `${err.message}${body}`
     }
   }
-  return { status: 502, message: `Upstream request failed: ${errMsg(err)}`, resHeaders: null }
-}
-
-/** 成功响应的上游响应标头（JSON 文本；SDK 未返回或为空时为 null） */
-async function upstreamResponseHeaders(result: ChatStreamResult): Promise<string | null> {
-  try {
-    const headers = (await result.response).headers
-    return headers && Object.keys(headers).length > 0 ? JSON.stringify(headers) : null
-  } catch {
-    return null
-  }
+  return { status: 502, message: `Upstream request failed: ${errMsg(err)}` }
 }
 
 /** 工具调用入参序列化：对象转 JSON 字符串，字符串视为已是 JSON 文本 */

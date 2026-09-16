@@ -1,4 +1,5 @@
 import { registerDbIpc } from '$/db/dbIpc'
+import { registerAppIpc } from '$/ipc/appIpc'
 import { registerLogIpc } from '$/ipc/logIpc'
 import { registerModelIpc } from '$/ipc/modelIpc'
 import { registerProviderIpc } from '$/ipc/providerIpc'
@@ -12,6 +13,7 @@ import { registerUsageIpc } from '$/ipc/usageIpc'
  */
 export function registerIpc(): void {
   registerDbIpc()
+  registerAppIpc()
   registerProviderIpc()
   registerModelIpc()
   registerServiceIpc()

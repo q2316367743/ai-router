@@ -27,29 +27,35 @@ export interface UpstreamPlan {
   maxOutputTokens: number | undefined
 }
 
-/** 按提供商协议构造 ai-sdk 模型实例与 provider 专属参数（extraHeaders 随请求透传上游） */
+/**
+ * 按提供商协议构造 ai-sdk 模型实例与 provider 专属参数
+ * （extraHeaders 随请求透传上游；fetchImpl 供线上请求/响应捕获注入）
+ */
 export function planUpstream(
   route: MappingRoute,
   effort: ReasoningEffort | undefined,
   clientMaxOutputTokens: number | undefined,
-  extraHeaders: Record<string, string>
+  extraHeaders: Record<string, string>,
+  fetchImpl?: typeof fetch
 ): UpstreamPlan {
   if (route.providerProtocol === 'anthropic') {
-    return planAnthropic(route, effort, clientMaxOutputTokens, extraHeaders)
+    return planAnthropic(route, effort, clientMaxOutputTokens, extraHeaders, fetchImpl)
   }
-  return planResponses(route, effort, clientMaxOutputTokens, extraHeaders)
+  return planResponses(route, effort, clientMaxOutputTokens, extraHeaders, fetchImpl)
 }
 
 function planAnthropic(
   route: MappingRoute,
   effort: ReasoningEffort | undefined,
   clientMax: number | undefined,
-  extraHeaders: Record<string, string>
+  extraHeaders: Record<string, string>,
+  fetchImpl: typeof fetch | undefined
 ): UpstreamPlan {
   const anthropic = createAnthropic({
     apiKey: route.providerApiKey,
     baseURL: normalizeBaseUrl(route.providerBaseUrl),
-    headers: extraHeaders
+    headers: extraHeaders,
+    fetch: fetchImpl
   })
   const budget = effort ? THINKING_BUDGET[effort] : undefined
   let maxOutputTokens = clientMax ?? DEFAULT_MAX_OUTPUT_TOKENS
@@ -70,12 +76,14 @@ function planResponses(
   route: MappingRoute,
   effort: ReasoningEffort | undefined,
   clientMax: number | undefined,
-  extraHeaders: Record<string, string>
+  extraHeaders: Record<string, string>,
+  fetchImpl: typeof fetch | undefined
 ): UpstreamPlan {
   const openai = createOpenAI({
     apiKey: route.providerApiKey,
     baseURL: normalizeBaseUrl(route.providerBaseUrl),
-    headers: extraHeaders
+    headers: extraHeaders,
+    fetch: fetchImpl
   })
   return {
     model: openai.responses(route.upstreamName),

@@ -1,5 +1,6 @@
 import { contextBridge } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
+import { appApi } from '~/modules/app/app'
 import { dbApi } from '~/modules/db/db'
 import { providerApi } from '~/modules/provider/provider'
 import { modelApi } from '~/modules/model/model'
@@ -11,6 +12,7 @@ import { usageApi } from '~/modules/usage/usage'
 // 各域 API 在 src/preload/src/modules/<域>/ 实现，在此组装暴露给渲染层（window.preload）。
 // 契约类型同步声明在 src/renderer/src/vite-env.d.ts 的 Window.preload。
 const preload = {
+  app: appApi,
   db: dbApi,
   provider: providerApi,
   model: modelApi,
