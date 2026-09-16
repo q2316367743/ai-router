@@ -3,6 +3,12 @@
   "version": "1.0.0",
   "description": "AI Router",
   "main": "./out/main/index.js",
+  "license": "Apache-2.0",
+  "repository": {
+    "directory": ".",
+    "type": "GitHub",
+    "url": "https://github.com/q2316367743/ai-router"
+  },
   "author": {
     "name": "esion",
     "url": "https://blog.esion.xyz"
