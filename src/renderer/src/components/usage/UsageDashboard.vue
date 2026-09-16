@@ -77,6 +77,9 @@
           :option="providerOption"
           :height="providerHeight"
         />
+
+        <!-- 模型速度折线（固定近七天窗口，独立于上方的维度切换与筛选） -->
+        <UsageSpeedCard v-if="showSpeed" />
       </div>
     </t-loading>
   </div>
@@ -89,6 +92,7 @@
  * - 统计数据由父组件经 useUsageStats 创建后传入（stats prop），避免同一数据两处拉取；
  *   首页需要把成功率放进顶部系统状态行，故不能由本组件私有取数。
  * - compact=true 时压缩图表高度以适配托盘窄面板。
+ * - showSpeed 单独开关：模型速度折线的数据源与窗口都独立于维度切换，托盘窄面板也不放下多线图。
  */
 import { computed } from 'vue'
 import type { UsageRangeKey } from '@common/types'
@@ -98,6 +102,7 @@ import UsageChartCard from './UsageChartCard.vue'
 import UsageActivityCard from './UsageActivityCard.vue'
 import UsageCompositionCard from './UsageCompositionCard.vue'
 import UsageRatioCard from './UsageRatioCard.vue'
+import UsageSpeedCard from './UsageSpeedCard.vue'
 import {
   buildProviderBarOption,
   buildProviderTrendOption,
@@ -113,12 +118,15 @@ const props = withDefaults(
     ranges?: UsageRangeKey[]
     /** 是否展示供应商 / 模型筛选 */
     showFilters?: boolean
+    /** 是否展示模型速度折线（固定近七天，仅主窗口首页开启） */
+    showSpeed?: boolean
     /** 紧凑模式（托盘窄面板） */
     compact?: boolean
   }>(),
   {
     ranges: () => ['today', 'last24h', 'last7d', 'last30d'],
     showFilters: true,
+    showSpeed: false,
     compact: false
   }
 )

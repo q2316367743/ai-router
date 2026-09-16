@@ -24,6 +24,8 @@ import { dayLabel, hourLabel, todayKey } from '$/utils/date'
  *
  * - 两张聚合表列集合完全一致，仅时间桶键与粒度不同：usage_daily（天，永久）/ usage_hourly（小时，7 天）。
  * - 统计口径集中在本文件：token 只累加成功请求；请求数与耗时不分成败；成功率 = successCount / requestCount。
+ * - 唯一例外是模型速度折线：它需要「成功请求耗时」这个聚合表没有的口径，故直接实时聚合 request_logs，
+ *   实现在同目录的 `speedRepo.ts`。
  */
 
 /** usage_hourly 滚动保留窗口（天，含当天）：覆盖「今天」与「近 24 小时」两个维度 */

@@ -4,9 +4,15 @@
     <div class="window-drag-region"></div>
 
     <!-- 侧边栏：顶部留出 macOS 交通灯区域，可收起 -->
-    <t-aside :width="collapsed ? '0px' : '220px'" class="sidebar">
+    <t-aside :width="collapsed ? '76px' : '220px'" class="sidebar">
       <div class="traffic-light-holder"></div>
-      <t-menu :value="active" class="sidebar-menu" style="width: 100%" @change="onMenuChange">
+      <t-menu
+        :value="active"
+        class="sidebar-menu"
+        style="width: 100%"
+        :collapsed="collapsed"
+        @change="onMenuChange"
+      >
         <t-menu-item v-for="item in menus" :key="item.value" :value="item.value">
           <template #icon><t-icon :name="item.icon" /></template>
           {{ item.label }}

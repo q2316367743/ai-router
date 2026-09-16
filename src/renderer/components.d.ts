@@ -46,6 +46,7 @@ declare module 'vue' {
     UsageCompositionCard: typeof import('./src/components/usage/UsageCompositionCard.vue')['default']
     UsageDashboard: typeof import('./src/components/usage/UsageDashboard.vue')['default']
     UsageRatioCard: typeof import('./src/components/usage/UsageRatioCard.vue')['default']
+    UsageSpeedCard: typeof import('./src/components/usage/UsageSpeedCard.vue')['default']
     UsageStatCard: typeof import('./src/components/usage/UsageStatCard.vue')['default']
   }
 }

@@ -29,7 +29,7 @@
         </div>
       </div>
 
-      <UsageDashboard :stats="stats" />
+      <UsageDashboard :stats="stats" show-speed />
     </div>
   </PageLayout>
 </template>

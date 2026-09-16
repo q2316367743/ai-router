@@ -61,6 +61,24 @@ export interface UsageSeries {
   byProviderTokens: UsageSeriesLine[]
 }
 
+/** 模型速度折线（data 与桶等长；当日无有效请求为 null，折线断开而非画到 0） */
+export interface UsageSpeedLine {
+  /** 展示名：`供应商 · 模型` */
+  name: string
+  /** 每日输出速度（token/s） */
+  data: (number | null)[]
+}
+
+/** 模型速度图数据：固定近七天窗口，数据源为 request_logs（非聚合表，见 docs/app/04-统计看板.md） */
+export interface UsageModelSpeed {
+  /** 桶键 YYYY-MM-DD，长度 7 */
+  buckets: string[]
+  /** 展示标签 MM-DD */
+  labels: string[]
+  /** 按窗口内总输出 token 降序，最多 5 条 */
+  lines: UsageSpeedLine[]
+}
+
 /** 活跃度单日格子 */
 export interface UsageActivityCell {
   /** YYYY-MM-DD */

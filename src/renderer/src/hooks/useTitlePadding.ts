@@ -6,7 +6,6 @@
  */
 
 /** App.vue common-operator 的折叠按钮尺寸与间距 */
-const OPERATOR_SIZE = 32
 const OPERATOR_GAP = 8
 
 export interface UseTitlePaddingResult {
@@ -22,9 +21,8 @@ export const useTitlePadding = (): UseTitlePaddingResult => {
   const isMac = /mac/i.test(navigator.platform)
   // macOS 需让出左侧交通灯；其余平台左侧无系统按钮
   const l1 = isMac ? 76 : OPERATOR_GAP
-  const step = OPERATOR_SIZE + OPERATOR_GAP
   // 折叠态标题起点：仅预留折叠按钮一个
-  const l2 = l1 + step
+  const l2 = 40
   // 右侧叠加在各 header 基础 padding 之上的避让值
   const r1 = isMac ? 0 : 138 + OPERATOR_GAP
   return { l1, l2, r1 }

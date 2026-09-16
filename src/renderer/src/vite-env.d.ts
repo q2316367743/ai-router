@@ -15,6 +15,7 @@ import type {
   TodayStats,
   UsageDailyItem,
   UsageFilterOptions,
+  UsageModelSpeed,
   UsageOverview,
   UsageQuery
 } from '@common/types'
@@ -76,6 +77,8 @@ declare global {
         filterOptions(): Promise<UsageFilterOptions>
         /** 查询日期区间（含边界）内按日 × 供应商 × 模型的用量明细 */
         listByRange(startDate: string, endDate: string): Promise<UsageDailyItem[]>
+        /** 模型速度折线：固定近七天窗口，按供应商 × 模型分线（数据源为请求日志） */
+        modelSpeed(): Promise<UsageModelSpeed>
       }
       tray: {
         /** 收起托盘统计面板 */

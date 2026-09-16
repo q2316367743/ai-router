@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron'
 import type { UsageQuery, UsageRangeKey } from '@common/types'
 import { listUsageByRange, queryUsageFilterOptions, queryUsageOverview } from '../db/repo/usageRepo'
+import { queryModelSpeed } from '../db/repo/speedRepo'
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 const RANGE_KEYS: ReadonlySet<string> = new Set<UsageRangeKey>([
@@ -47,4 +48,7 @@ export function registerUsageIpc(): void {
     if (query.startDate > query.endDate) throw new Error('开始日期不能晚于结束日期')
     return listUsageByRange(query.startDate, query.endDate)
   })
+
+  // 模型速度折线：窗口固定近七天、不支持筛选，故无入参
+  ipcMain.handle('usage:modelSpeed', () => queryModelSpeed())
 }

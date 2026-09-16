@@ -4,7 +4,7 @@
  */
 import type { EChartsOption } from './echarts'
 import type { ChartPalette } from './tokens'
-import type { UsageSeriesLine } from '@common/types'
+import type { UsageSeriesLine, UsageSpeedLine } from '@common/types'
 import { formatTokens } from '@/utils/format'
 
 const AXIS_LABEL_FONT_SIZE = 10
@@ -237,6 +237,54 @@ export function buildProviderTrendOption(
       data: line.data,
       smooth: true,
       showSymbol: false,
+      lineStyle: { width: 2, color: palette.series[i % palette.series.length] },
+      itemStyle: { color: palette.series[i % palette.series.length] }
+    }))
+  }
+}
+
+/**
+ * 模型速度折线（按「供应商 · 模型」分线，单位 token/s）。
+ *
+ * 只有 7 个数据点且缺失日为 null，故显式显示数据点并禁止跨空连线，
+ * 避免把「当日无有效请求」误读成「速度为 0」。图例名较长，用滚动图例防止换行挤压绘图区。
+ */
+export function buildModelSpeedOption(
+  palette: ChartPalette,
+  labels: string[],
+  lines: UsageSpeedLine[]
+): EChartsOption {
+  const axis = baseAxis(palette)
+  return {
+    grid: { left: 8, right: 8, top: 32, bottom: 0, containLabel: true },
+    tooltip: {
+      ...baseTooltip(palette),
+      valueFormatter: (value) => (value == null ? '—' : `${Number(value).toFixed(1)} tok/s`)
+    },
+    legend: {
+      type: 'scroll',
+      top: 0,
+      left: 0,
+      itemWidth: 10,
+      itemHeight: 10,
+      textStyle: { color: palette.textSecondary, fontSize: 10 },
+      data: lines.map((line) => line.name)
+    },
+    xAxis: { type: 'category', data: labels, boundaryGap: false, ...axis },
+    yAxis: {
+      type: 'value',
+      name: 'tok/s',
+      nameTextStyle: { color: palette.placeholder, fontSize: 10 },
+      ...axis
+    },
+    series: lines.map((line, i) => ({
+      name: line.name,
+      type: 'line' as const,
+      data: line.data,
+      smooth: true,
+      showSymbol: true,
+      symbolSize: 6,
+      connectNulls: false,
       lineStyle: { width: 2, color: palette.series[i % palette.series.length] },
       itemStyle: { color: palette.series[i % palette.series.length] }
     }))
