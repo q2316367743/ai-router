@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import type { MappingRoute } from '$/db/repo/modelRepo'
 import { findMapping } from '$/db/repo/modelRepo'
 import { errMsg, sendOpenAiError } from './httpRespond'
+import { buildForwardHeaders, collectExtraHeaders } from './forwardHeaders'
 import { addUsageQuietly, recordLocalLog, type TokenUsage } from './proxyLog'
 import { forwardConverted } from './protocol/convertHandler'
 
@@ -52,7 +52,14 @@ export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Pr
 
   // 异协议上游：OpenAI Chat 请求/响应与上游互转（ai-sdk 中间层）
   if (route.providerProtocol !== 'openai') {
-    await forwardConverted(parsed, res, route, publicModel, startedAt)
+    await forwardConverted({
+      body: parsed,
+      res,
+      route,
+      publicModel,
+      startedAt,
+      extraHeaders: collectExtraHeaders(req)
+    })
     return
   }
 
@@ -166,15 +173,6 @@ async function pipeStreamResponse(upstream: Response, res: ServerResponse): Prom
     usage: feeder.flush(),
     errorSnippet: upstream.ok ? null : headText.slice(0, 500)
   }
-}
-
-function buildForwardHeaders(req: IncomingMessage, route: MappingRoute): Record<string, string> {
-  const headers: Record<string, string> = { authorization: `Bearer ${route.providerApiKey}` }
-  const contentType = req.headers['content-type']
-  if (typeof contentType === 'string') headers['content-type'] = contentType
-  const accept = req.headers['accept']
-  if (typeof accept === 'string') headers['accept'] = accept
-  return headers
 }
 
 function joinUpstreamUrl(baseUrl: string, requestPath: string): string {

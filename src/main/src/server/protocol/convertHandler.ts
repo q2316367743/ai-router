@@ -31,17 +31,22 @@ interface UpstreamFailure {
   message: string
 }
 
+/** 转换转发入参（extraHeaders：客户端自定义请求头，经 SDK headers 选项透传上游） */
+export interface ForwardConvertedOptions {
+  body: unknown
+  res: ServerResponse
+  route: MappingRoute
+  publicModel: string
+  startedAt: number
+  extraHeaders: Record<string, string>
+}
+
 /**
  * 转换转发：客户端为 OpenAI Chat 协议，上游为 anthropic / openai-responses。
  * 请求侧解析为 ai-sdk 统一提示，响应侧把统一流重编码为 OpenAI Chat 线上格式（含 SSE）。
  */
-export async function forwardConverted(
-  body: unknown,
-  res: ServerResponse,
-  route: MappingRoute,
-  publicModel: string,
-  startedAt: number
-): Promise<void> {
+export async function forwardConverted(options: ForwardConvertedOptions): Promise<void> {
+  const { body, res, route, publicModel, startedAt, extraHeaders } = options
   const log = (outcome: ConvertOutcome): void => {
     recordLocalLog({
       path: '/v1/chat/completions',
@@ -67,7 +72,7 @@ export async function forwardConverted(
     return
   }
 
-  const plan = planUpstream(route, prompt.reasoningEffort, prompt.maxOutputTokens)
+  const plan = planUpstream(route, prompt.reasoningEffort, prompt.maxOutputTokens, extraHeaders)
   const controller = new AbortController()
   res.on('close', () => {
     if (!res.writableEnded) controller.abort()

@@ -12,13 +12,15 @@ const MAX_BODY_BYTES = '32mb'
 export function createProxyApp(): Express {
   const app = express()
 
-  // CORS：预检直接放行；其余响应统一放行来源（服务自身有 Key 鉴权）
+  // CORS：预检直接放行（allow-headers 回显客户端申请的自定义头，如 x-session-id）；其余响应统一放行来源
   app.use((req, res, next) => {
     if (req.method === 'OPTIONS') {
+      const requested = req.headers['access-control-request-headers']
       res.writeHead(204, {
         'access-control-allow-origin': '*',
         'access-control-allow-methods': 'GET, POST, OPTIONS',
-        'access-control-allow-headers': 'authorization, content-type, x-api-key, x-request-id',
+        'access-control-allow-headers':
+          typeof requested === 'string' && requested ? requested : '*',
         'access-control-max-age': '86400'
       })
       res.end()

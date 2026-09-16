@@ -26,24 +26,29 @@ export interface UpstreamPlan {
   maxOutputTokens: number | undefined
 }
 
-/** 按提供商协议构造 ai-sdk 模型实例与 provider 专属参数 */
+/** 按提供商协议构造 ai-sdk 模型实例与 provider 专属参数（extraHeaders 随请求透传上游） */
 export function planUpstream(
   route: MappingRoute,
   effort: ReasoningEffort | undefined,
-  clientMaxOutputTokens: number | undefined
+  clientMaxOutputTokens: number | undefined,
+  extraHeaders: Record<string, string>
 ): UpstreamPlan {
-  if (route.providerProtocol === 'anthropic') return planAnthropic(route, effort, clientMaxOutputTokens)
-  return planResponses(route, effort, clientMaxOutputTokens)
+  if (route.providerProtocol === 'anthropic') {
+    return planAnthropic(route, effort, clientMaxOutputTokens, extraHeaders)
+  }
+  return planResponses(route, effort, clientMaxOutputTokens, extraHeaders)
 }
 
 function planAnthropic(
   route: MappingRoute,
   effort: ReasoningEffort | undefined,
-  clientMax: number | undefined
+  clientMax: number | undefined,
+  extraHeaders: Record<string, string>
 ): UpstreamPlan {
   const anthropic = createAnthropic({
     apiKey: route.providerApiKey,
-    baseURL: ensureVersioned(route.providerBaseUrl)
+    baseURL: ensureVersioned(route.providerBaseUrl),
+    headers: extraHeaders
   })
   const budget = effort ? THINKING_BUDGET[effort] : undefined
   let maxOutputTokens = clientMax ?? DEFAULT_MAX_OUTPUT_TOKENS
@@ -63,11 +68,13 @@ function planAnthropic(
 function planResponses(
   route: MappingRoute,
   effort: ReasoningEffort | undefined,
-  clientMax: number | undefined
+  clientMax: number | undefined,
+  extraHeaders: Record<string, string>
 ): UpstreamPlan {
   const openai = createOpenAI({
     apiKey: route.providerApiKey,
-    baseURL: ensureVersioned(route.providerBaseUrl)
+    baseURL: ensureVersioned(route.providerBaseUrl),
+    headers: extraHeaders
   })
   return {
     model: openai.responses(route.upstreamName),
