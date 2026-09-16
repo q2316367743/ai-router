@@ -3,6 +3,7 @@ import { nanoid } from 'nanoid'
 import type { ModelMappingInfo, ModelMappingInput, ProviderProtocol } from '@common/types'
 import { db } from '../client'
 import { models, providers } from '../schema'
+import { applyModelRename } from './renameRepo'
 
 export function listModelMappings(): ModelMappingInfo[] {
   return db()
@@ -23,6 +24,8 @@ export function listModelMappings(): ModelMappingInfo[] {
 
 /** 代理转发路由：按对外模型名一次联表取齐映射与提供商信息 */
 export interface MappingRoute {
+  /** 映射 ID：随日志与用量一并落库，供改名时定位历史行（见 renameRepo） */
+  modelId: string
   publicName: string
   upstreamName: string
   mappingEnabled: boolean
@@ -37,6 +40,7 @@ export interface MappingRoute {
 export function findMapping(publicName: string): MappingRoute | null {
   const row = db()
     .select({
+      modelId: models.id,
       publicName: models.publicName,
       upstreamName: models.upstreamName,
       mappingEnabled: models.enabled,
@@ -71,18 +75,39 @@ export function createModelMapping(input: ModelMappingInput): string {
   return id
 }
 
+/**
+ * 更新模型映射；对外模型名变化时同步改写历史统计与日志（见 renameRepo），单事务保证一致性。
+ *
+ * 旧名以库中值为准，不信入参：列表页行内启停会把整行回传（对外名未变），据入参判断会在
+ * 每次启停时白扫历史表。改绑 providerId 不触发改写 —— 历史请求确实发给了旧供应商，
+ * 改掉就是伪造历史。
+ */
 export function updateModelMapping(input: ModelMappingInput): void {
   ensurePublicNameAvailable(input.publicName, input.id)
-  db()
-    .update(models)
-    .set({
-      providerId: input.providerId,
-      publicName: input.publicName,
-      upstreamName: input.upstreamName,
-      enabled: input.enabled
-    })
-    .where(eq(models.id, input.id ?? ''))
-    .run()
+  const id = input.id ?? ''
+  db().transaction((tx) => {
+    const previous = tx
+      .select({ publicName: models.publicName })
+      .from(models)
+      .where(eq(models.id, id))
+      .get()
+    // 与改造前一致：id 不存在时静默不改
+    if (!previous) return
+
+    tx.update(models)
+      .set({
+        providerId: input.providerId,
+        publicName: input.publicName,
+        upstreamName: input.upstreamName,
+        enabled: input.enabled
+      })
+      .where(eq(models.id, id))
+      .run()
+
+    if (previous.publicName !== input.publicName) {
+      applyModelRename(tx, id, previous.publicName, input.publicName)
+    }
+  })
 }
 
 export function removeModelMapping(id: string): void {

@@ -1,5 +1,6 @@
 import { recordLog, startLog, type RequestLogStart } from '$/db/repo/logRepo'
 import { accumulateUsage } from '$/db/repo/usageRepo'
+import type { HistoryRef } from '$/db/repo/renameRepo'
 import { refreshTrayUsage } from '$/app/tray'
 
 /** token 用量（透传路径从响应提取，转换路径来自 ai-sdk 统一 usage；均为提供商上报值） */
@@ -12,7 +13,7 @@ export interface TokenUsage {
   totalTokens: number
 }
 
-export interface ProxyLogEntry {
+export interface ProxyLogEntry extends HistoryRef {
   path: string
   requestId: string
   publicModel: string
@@ -78,6 +79,8 @@ export function recordRequest(entry: ProxyLogEntry): void {
       publicModel: entry.publicModel,
       providerName: entry.providerName,
       upstreamModel: entry.upstreamModel,
+      providerId: entry.providerId,
+      modelId: entry.modelId,
       startedAt: entry.startedAt,
       finishedAt,
       status: entry.status,
@@ -100,6 +103,8 @@ export function recordRequest(entry: ProxyLogEntry): void {
     accumulateUsage({
       providerName: entry.providerName,
       publicModel: entry.publicModel,
+      providerId: entry.providerId,
+      modelId: entry.modelId,
       status: entry.status,
       durationMs,
       promptTokens: usage?.promptTokens ?? 0,

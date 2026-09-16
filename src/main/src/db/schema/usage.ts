@@ -9,6 +9,14 @@ import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlit
 
 /** 单次请求累加到聚合表的最小入参（由 proxyLog 统一写入） */
 const usageColumns = {
+  /**
+   * 归属供应商 / 模型映射 ID：**不参与分组，仅供改名时精确圈定历史行**。
+   *
+   * 分组键仍是 provider_name / public_model（看板按名字聚合），故同名供应商的历史行会被
+   * 融合在同一行上，此时该列只保留首次写入者。可空：本次改动之前写入的行没有值。
+   */
+  providerId: text('provider_id'),
+  modelId: text('model_id'),
   /** 请求数（含失败） */
   requestCount: integer('request_count').notNull().default(0),
   /** 成功请求数（HTTP 2xx） */

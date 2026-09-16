@@ -9,15 +9,24 @@ import type {
 import { db } from '../client'
 import { requestLogs } from '../schema'
 import { dateKey, todayKey } from '../../utils/date'
+import type { HistoryRef } from './renameRepo'
 
 /** 保留窗口：最近 7 天（含当天） */
 const RETENTION_DAYS = 7
 
-export type RequestLogEntry = Omit<RequestLogDetail, 'id' | 'logDate'>
+export type RequestLogEntry = Omit<RequestLogDetail, 'id' | 'logDate'> & HistoryRef
 /** pending 行入参：结束阶段才可知的字段全部缺省（由 recordLog 回填） */
 export type RequestLogStart = Pick<
   RequestLogEntry,
-  'requestId' | 'startedAt' | 'publicModel' | 'providerName' | 'upstreamModel' | 'path' | 'stream'
+  | 'requestId'
+  | 'startedAt'
+  | 'publicModel'
+  | 'providerName'
+  | 'upstreamModel'
+  | 'providerId'
+  | 'modelId'
+  | 'path'
+  | 'stream'
 > &
   Partial<Pick<RequestLogEntry, 'requestHeaders' | 'requestBody'>>
 
@@ -83,6 +92,8 @@ export function startLog(entry: RequestLogStart): void {
         publicModel: entry.publicModel,
         providerName: entry.providerName,
         upstreamModel: entry.upstreamModel,
+        providerId: entry.providerId,
+        modelId: entry.modelId,
         path: entry.path,
         stream: entry.stream,
         requestHeaders: entry.requestHeaders ?? null,

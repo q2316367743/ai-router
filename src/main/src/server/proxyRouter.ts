@@ -47,6 +47,8 @@ export function createProxyApp(): Express {
       publicModel: '-',
       providerName: '-',
       upstreamModel: '-',
+      providerId: null,
+      modelId: null,
       startedAt,
       status: 401,
       stream: false,

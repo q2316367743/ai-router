@@ -20,7 +20,7 @@
 
 | 文档                                             | 描述                                                                                                             |
 |--------------------------------------------------|------------------------------------------------------------------------------------------------------------------|
-| [01-数据模型.md](./data/01-数据模型.md)          | 6 张表结构（providers/models/settings/request_logs/usage_daily/usage_hourly）、request_logs 全量采集字段（正文/标头/七维 token/请求 ID）与**两阶段落库**（startLog 落 pending 行 → recordLog 按 request_id upsert 回填 / 启动收口残留为 499）、最近 7 天惰性清理（按天节流）、用量双粒度聚合表（日永久 + 小时 7 天）与 7 类统计口径、repo 与 IPC 通道清单（含 log:changed 推送）、@common/types 三端契约组织、新增表流程备忘 |
+| [01-数据模型.md](./data/01-数据模型.md)          | 6 张表结构（providers/models/settings/request_logs/usage_daily/usage_hourly）、request_logs 全量采集字段（正文/标头/七维 token/请求 ID）与**两阶段落库**（startLog 落 pending 行 → recordLog 按 request_id upsert 回填 / 启动收口残留为 499）、最近 7 天惰性清理（按天节流）、用量双粒度聚合表（日永久 + 小时 7 天）与 7 类统计口径、**删除 / 改名与历史数据**（名字快照语义：删除不影响历史、为什么不需要软删除、改名按 provider_id/model_id 集合式改写历史 + 性能边界与已知限制）、repo 与 IPC 通道清单（含 log:changed 推送）、@common/types 三端契约组织、新增表流程备忘 |
 
 ### server/ —— 本地代理服务
 

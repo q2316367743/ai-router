@@ -16,6 +16,7 @@ import type {
 } from '@common/types'
 import { db } from '../client'
 import { usageDaily, usageHourly } from '../schema'
+import type { HistoryRef } from './renameRepo'
 import { dayLabel, hourLabel, todayKey } from '$/utils/date'
 
 /**
@@ -35,7 +36,7 @@ const ACTIVITY_DAYS_LONG = 30
 type UsageTable = typeof usageDaily | typeof usageHourly
 
 /** 单次请求累加聚合表的入参（token 字段由调用方保证仅在成功请求时有值） */
-export interface UsageAccumulateInput {
+export interface UsageAccumulateInput extends HistoryRef {
   providerName: string
   publicModel: string
   /** HTTP 状态码（2xx 视为成功） */
@@ -147,6 +148,8 @@ export function accumulateUsage(input: UsageAccumulateInput): void {
   const values = {
     providerName: input.providerName,
     publicModel: input.publicModel,
+    providerId: input.providerId,
+    modelId: input.modelId,
     requestCount: 1,
     successCount: ok ? 1 : 0,
     failCount: ok ? 0 : 1,
@@ -184,6 +187,12 @@ export function accumulateUsage(input: UsageAccumulateInput): void {
 /** 冲突累加：两表列集合一致，仅表引用不同 */
 function conflictSet(table: UsageTable) {
   return {
+    // 归属 id 用 coalesce：已有值不覆盖，只在为空时补上。
+    // 不覆盖是因为同名供应商的历史行已被融合在同一行上，该列只记首次写入者，覆盖会改变
+    // 「这行归谁」的既有判断（改名正是按 id 圈定行的）；补空则让本次改动之前写入的无 id
+    // 老行在下次累加时获得 id，重新可被改名跟随。
+    providerId: sql`coalesce(${table.providerId}, excluded.provider_id)`,
+    modelId: sql`coalesce(${table.modelId}, excluded.model_id)`,
     requestCount: sql`${table.requestCount} + excluded.request_count`,
     successCount: sql`${table.successCount} + excluded.success_count`,
     failCount: sql`${table.failCount} + excluded.fail_count`,

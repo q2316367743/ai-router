@@ -64,6 +64,8 @@ export async function forwardConverted(options: ForwardConvertedOptions): Promis
     publicModel,
     providerName: route.providerName,
     upstreamModel: route.upstreamName,
+    providerId: route.providerId,
+    modelId: route.modelId,
     path: logPath,
     stream: isRecord(body) && body['stream'] === true
   })
@@ -75,6 +77,8 @@ export async function forwardConverted(options: ForwardConvertedOptions): Promis
       publicModel,
       providerName: route.providerName,
       upstreamModel: route.upstreamName,
+      providerId: route.providerId,
+      modelId: route.modelId,
       startedAt,
       status: outcome.status,
       stream: outcome.stream,

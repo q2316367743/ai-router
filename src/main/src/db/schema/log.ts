@@ -20,6 +20,12 @@ export const requestLogs = sqliteTable(
     publicModel: text('public_model').notNull(),
     providerName: text('provider_name').notNull(),
     upstreamModel: text('upstream_model').notNull(),
+    /**
+     * 归属供应商 / 模型映射 ID：仅供改名时精确圈定历史行（同名供应商不误伤）。
+     * 可空：本次改动之前写入的行没有值；名字仍是唯一展示与筛选依据。
+     */
+    providerId: text('provider_id'),
+    modelId: text('model_id'),
     path: text('path').notNull(),
     /** 响应状态码；本地拦截时为 400/401/404/502 等；null 表示请求进行中 */
     status: integer('status'),
