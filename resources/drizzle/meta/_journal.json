@@ -8,6 +8,13 @@
       "when": 1789485381789,
       "tag": "0000_swift_smasher",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1789521476922,
+      "tag": "0001_silly_overlord",
+      "breakpoints": true
     }
   ]
 }

@@ -9,6 +9,7 @@ export function listProviders(): ProviderInfo[] {
     .select({
       id: providers.id,
       name: providers.name,
+      protocol: providers.protocol,
       baseUrl: providers.baseUrl,
       apiKey: providers.apiKey,
       enabled: providers.enabled,
@@ -29,6 +30,7 @@ export function createProvider(input: ProviderInput): string {
     .values({
       id,
       name: input.name,
+      protocol: input.protocol,
       baseUrl: input.baseUrl,
       apiKey: input.apiKey,
       enabled: input.enabled,
@@ -44,6 +46,7 @@ export function updateProvider(input: ProviderInput): void {
     .update(providers)
     .set({
       name: input.name,
+      protocol: input.protocol,
       baseUrl: input.baseUrl,
       apiKey: input.apiKey,
       enabled: input.enabled,

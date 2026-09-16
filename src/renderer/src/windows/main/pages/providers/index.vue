@@ -9,6 +9,11 @@
 
     <div class="p-24px">
       <t-table row-key="id" :data="list" :columns="columns" :loading="loading" hover>
+        <template #protocol="{ row }">
+          <t-tag :theme="PROTOCOL_META[row.protocol].theme" variant="outline" size="small">
+            {{ PROTOCOL_META[row.protocol].label }}
+          </t-tag>
+        </template>
         <template #apiKey="{ row }">
           <span class="text-13px text-td-secondary">{{ maskKey(row.apiKey) }}</span>
         </template>
@@ -31,7 +36,7 @@
 
 <script lang="ts" setup>
 import { onMounted, ref } from 'vue'
-import type { ProviderInfo } from '@common/types'
+import type { ProviderInfo, ProviderProtocol } from '@common/types'
 import { MessagePlugin } from 'tdesign-vue-next'
 import { maskKey } from '@/utils/format'
 import PageLayout from '@/components/PageLayout/PageLayout.vue'
@@ -40,8 +45,15 @@ import { openProviderDialog } from './modals/ProviderDialog'
 const list = ref<ProviderInfo[]>([])
 const loading = ref(false)
 
+const PROTOCOL_META: Record<ProviderProtocol, { label: string; theme: 'default' | 'primary' | 'success' }> = {
+  openai: { label: 'OpenAI Chat', theme: 'default' },
+  'openai-responses': { label: 'OpenAI Responses', theme: 'primary' },
+  anthropic: { label: 'Anthropic', theme: 'success' }
+}
+
 const columns = [
-  { colKey: 'name', title: '名称', width: 160 },
+  { colKey: 'name', title: '名称', width: 140 },
+  { colKey: 'protocol', title: '协议', width: 150 },
   { colKey: 'baseUrl', title: 'Base URL', ellipsis: true },
   { colKey: 'apiKey', title: 'API Key', width: 150 },
   { colKey: 'modelCount', title: '模型数', width: 90 },

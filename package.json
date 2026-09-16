@@ -23,8 +23,11 @@
     "build:linux": "npm run build && electron-builder --linux"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.54",
+    "@ai-sdk/openai": "^4.0.67",
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
+    "ai": "^7.0.102",
     "better-sqlite3": "^13.0.3",
     "drizzle-orm": "^0.45.2",
     "electron-updater": "^6.3.9",

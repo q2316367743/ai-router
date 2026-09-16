@@ -1,7 +1,11 @@
+/** 提供商上游接口协议：决定出站认证头与请求/响应的线上格式 */
+export type ProviderProtocol = 'openai' | 'openai-responses' | 'anthropic'
+
 /** 提供商信息（list 时附带模型映射数量） */
 export interface ProviderInfo {
   id: string
   name: string
+  protocol: ProviderProtocol
   baseUrl: string
   apiKey: string
   enabled: boolean
@@ -14,6 +18,7 @@ export interface ProviderInfo {
 export interface ProviderInput {
   id?: string
   name: string
+  protocol: ProviderProtocol
   baseUrl: string
   apiKey: string
   enabled: boolean

@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
-import type { ModelMappingInfo, ModelMappingInput } from '@common/types'
+import type { ModelMappingInfo, ModelMappingInput, ProviderProtocol } from '@common/types'
 import { db } from '../client'
 import { models, providers } from '../schema'
 
@@ -28,6 +28,7 @@ export interface MappingRoute {
   mappingEnabled: boolean
   providerId: string
   providerName: string
+  providerProtocol: ProviderProtocol
   providerBaseUrl: string
   providerApiKey: string
   providerEnabled: boolean
@@ -41,6 +42,7 @@ export function findMapping(publicName: string): MappingRoute | null {
       mappingEnabled: models.enabled,
       providerId: providers.id,
       providerName: providers.name,
+      providerProtocol: providers.protocol,
       providerBaseUrl: providers.baseUrl,
       providerApiKey: providers.apiKey,
       providerEnabled: providers.enabled

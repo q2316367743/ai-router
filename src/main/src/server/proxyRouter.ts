@@ -1,7 +1,9 @@
 import express, { type Express, type NextFunction, type Request, type Response } from 'express'
 import { listModelMappings } from '$/db/repo/modelRepo'
 import { getServiceConfig } from '$/db/repo/settingRepo'
-import { errMsg, forwardRequest, recordLocalLog, sendJson, sendOpenAiError } from './proxyHandler'
+import { errMsg, sendJson, sendOpenAiError } from './httpRespond'
+import { recordLocalLog } from './proxyLog'
+import { forwardRequest } from './proxyHandler'
 
 /** 请求体上限：32MB，防异常大包拖垮内存 */
 const MAX_BODY_BYTES = '32mb'
@@ -48,8 +50,9 @@ export function createProxyApp(): Express {
 
   app.get('/v1/models', handleListModels)
 
-  // /v1/* 转发：express.json 负责 body 解析与 32MB 上限（超限/非法 JSON 由错误兜底中间件转换）
-  app.post(/^\/v1\//, express.json({ limit: MAX_BODY_BYTES }), (req, res, next) => {
+  // 对外仅暴露 OpenAI Chat Completions：express.json 负责 body 解析与 32MB 上限
+  // （超限/非法 JSON 由错误兜底中间件转换）；异协议上游在 forwardRequest 内走转换路径
+  app.post('/v1/chat/completions', express.json({ limit: MAX_BODY_BYTES }), (req, res, next) => {
     forwardRequest(req, res).catch(next)
   })
 

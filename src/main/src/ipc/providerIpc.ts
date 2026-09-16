@@ -1,6 +1,8 @@
 import { ipcMain } from 'electron'
-import type { ProviderInput } from '@common/types'
+import type { ProviderInput, ProviderProtocol } from '@common/types'
 import { createProvider, listProviders, removeProvider, updateProvider } from '../db/repo/providerRepo'
+
+const PROTOCOLS: readonly ProviderProtocol[] = ['openai', 'openai-responses', 'anthropic']
 
 /** 提供商域 IPC：只做参数校验与转发，数据操作在 providerRepo */
 export function registerProviderIpc(): void {
@@ -25,6 +27,7 @@ export function registerProviderIpc(): void {
 
 function assertProviderInput(input: ProviderInput): void {
   if (!input?.name?.trim()) throw new Error('名称不能为空')
+  if (!PROTOCOLS.includes(input?.protocol)) throw new Error('接口类型不合法')
   if (!input?.baseUrl?.trim()) throw new Error('Base URL 不能为空')
   if (!input?.apiKey?.trim()) throw new Error('API Key 不能为空')
 }

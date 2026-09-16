@@ -1,15 +1,9 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { MappingRoute } from '$/db/repo/modelRepo'
 import { findMapping } from '$/db/repo/modelRepo'
-import { recordLog } from '$/db/repo/logRepo'
-import { addUsage } from '$/db/repo/usageRepo'
-import { refreshTrayUsage } from '$/app/tray'
-
-interface TokenUsage {
-  promptTokens: number
-  completionTokens: number
-  totalTokens: number
-}
+import { errMsg, sendOpenAiError } from './httpRespond'
+import { addUsageQuietly, recordLocalLog, type TokenUsage } from './proxyLog'
+import { forwardConverted } from './protocol/convertHandler'
 
 interface PassResult {
   usage: TokenUsage | null
@@ -20,7 +14,7 @@ interface PassResult {
 /** 经 express.json 解析后的请求：转发层只依赖 body，不引入框架类型（避免与 fetch 的全局 Response 重名） */
 type ProxyRequest = IncomingMessage & { body?: unknown }
 
-/** POST /v1/*：校验 body → 查映射 → 替换 model 转发上游 → 透传响应 → 日志/用量落库 */
+/** POST /v1/chat/completions：校验 body → 查映射 → 按提供商协议透传或转换 → 日志/用量落库 */
 export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Promise<void> {
   const startedAt = Date.now()
   const path = req.url ?? '/'
@@ -56,7 +50,13 @@ export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Pr
     return
   }
 
-  // 除 model 外全部透传：仅替换 model 字段，其余键原样保留
+  // 异协议上游：OpenAI Chat 请求/响应与上游互转（ai-sdk 中间层）
+  if (route.providerProtocol !== 'openai') {
+    await forwardConverted(parsed, res, route, publicModel, startedAt)
+    return
+  }
+
+  // 同协议（OpenAI Chat 兼容）：纯透传，除 model 外全部原样保留
   payload['model'] = route.upstreamName
 
   const controller = new AbortController()
@@ -243,79 +243,4 @@ function toCount(value: unknown): number {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
-}
-
-export function recordLocalLog(entry: {
-  path: string
-  publicModel: string
-  providerName: string
-  upstreamModel: string
-  startedAt: number
-  status: number
-  stream: boolean
-  usage: TokenUsage | null
-  error: string | null
-}): void {
-  try {
-    recordLog({
-      publicModel: entry.publicModel,
-      providerName: entry.providerName,
-      upstreamModel: entry.upstreamModel,
-      path: entry.path,
-      status: entry.status,
-      durationMs: Date.now() - entry.startedAt,
-      stream: entry.stream,
-      promptTokens: entry.usage?.promptTokens ?? 0,
-      completionTokens: entry.usage?.completionTokens ?? 0,
-      totalTokens: entry.usage?.totalTokens ?? 0,
-      error: entry.error
-    })
-  } catch {
-    // 日志落库失败不影响代理服务
-  }
-}
-
-function addUsageQuietly(publicModel: string, usage: TokenUsage | null): void {
-  try {
-    addUsage({
-      publicModel,
-      promptTokens: usage?.promptTokens ?? 0,
-      completionTokens: usage?.completionTokens ?? 0,
-      totalTokens: usage?.totalTokens ?? 0
-    })
-    // 落库成功后即时刷新托盘上的今日用量
-    refreshTrayUsage()
-  } catch {
-    // 用量落库失败不影响代理服务
-  }
-}
-
-export function sendOpenAiError(
-  res: ServerResponse,
-  status: number,
-  message: string,
-  code?: string
-): void {
-  sendJson(res, status, {
-    error: {
-      message,
-      type:
-        status === 401
-          ? 'authentication_error'
-          : status >= 500
-            ? 'api_error'
-            : 'invalid_request_error',
-      code: code ?? null
-    }
-  })
-}
-
-export function sendJson(res: ServerResponse, status: number, payload: unknown): void {
-  if (res.writableEnded || res.destroyed) return
-  res.writeHead(status, { 'content-type': 'application/json' })
-  res.end(JSON.stringify(payload))
-}
-
-export function errMsg(err: unknown): string {
-  return err instanceof Error ? err.message : String(err)
 }
