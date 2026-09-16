@@ -30,25 +30,19 @@
     <t-loading :loading="loading" size="small">
       <div class="flex flex-col gap-12px">
         <!-- 请求数 / 成功率 / 平均延迟 / 总 tokens（窄面板下 2 列两行，避免挤压） -->
-        <div class="grid gap-8px" :class="compact ? 'grid-cols-2' : 'grid-cols-4'">
+        <div class="grid gap-10px" :class="compact ? 'grid-cols-2' : 'grid-cols-4'">
           <UsageStatCard
-            label="请求数"
-            :value="String(totals.requestCount)"
-            :hint="`成功 ${totals.successCount} · 失败 ${totals.failCount}`"
-            tone="brand"
-          />
-          <UsageStatCard label="成功率" :value="successText" tone="success" />
-          <UsageStatCard label="平均延迟" :value="latencyText" tone="warning" />
-          <UsageStatCard
-            label="总 Tokens"
-            :value="formatTokens(totals.totalTokens)"
-            :hint="`缓存占比 ${cacheRatio.toFixed(1)}%`"
+            v-for="card in cards"
+            :key="card.key"
+            :config="card"
+            :value-size="compact ? 22 : 26"
           />
         </div>
 
         <!-- 柱状（请求数）+ 折线（总 token / 缓存 token） -->
         <UsageChartCard
           title="请求与用量趋势"
+          icon="chart-combo"
           :option="trendOption"
           :height="compact ? 180 : 240"
         />
@@ -57,6 +51,7 @@
         <UsageChartCard
           v-if="providerTrendOption"
           title="供应商 Tokens 趋势"
+          icon="chart-line"
           :option="providerTrendOption"
           :height="compact ? 160 : 220"
         />
@@ -74,6 +69,7 @@
         <UsageChartCard
           v-if="providerOption"
           title="供应商 Tokens"
+          icon="chart-bar"
           :option="providerOption"
           :height="providerHeight"
         />
@@ -103,13 +99,13 @@ import UsageActivityCard from './UsageActivityCard.vue'
 import UsageCompositionCard from './UsageCompositionCard.vue'
 import UsageRatioCard from './UsageRatioCard.vue'
 import UsageSpeedCard from './UsageSpeedCard.vue'
+import { useUsageCards } from './useUsageCards'
 import {
   buildProviderBarOption,
   buildProviderTrendOption,
   buildRequestTokenOption
 } from '@/components/EChart/options'
 import { useChartPalette } from '@/components/EChart/tokens'
-import { formatTokens } from '@/utils/format'
 
 const props = withDefaults(
   defineProps<{
@@ -149,12 +145,12 @@ const {
   loading,
   overview,
   filterOptions,
-  successRate,
-  averageDurationMs,
   cacheTokens,
-  cacheRatio,
   composition
 } = props.stats
+
+/** 四张统计卡的展示配置（图标 / 胶囊 / 迷你图 / 页脚）在 useUsageCards 里派生 */
+const cards = useUsageCards(props.stats)
 
 const rangeOptions = computed(() =>
   props.ranges.map((value) => ({ value, label: RANGE_LABELS[value] }))
@@ -169,15 +165,6 @@ const modelOptions = computed(() =>
 
 const totals = computed(() => overview.value.totals)
 const activity = computed(() => overview.value.activity)
-
-const successText = computed(() =>
-  successRate.value === null ? '—' : `${successRate.value.toFixed(1)}%`
-)
-
-const latencyText = computed(() => {
-  const ms = averageDurationMs.value
-  return ms === null ? '—' : `${(ms / 1000).toFixed(2)}s`
-})
 
 const trendOption = computed(() => {
   const series = overview.value.series

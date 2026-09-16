@@ -596,5 +596,41 @@
 }
 
 .t-list {
-  background-color: var(--kb-bg-color-container) !important;
+  // 原为 --kb-bg-color-container，变量名拼错导致这条 background-color 整条失效
+  background-color: var(--td-bg-color-container) !important;
+}
+
+// ============ 统计数值 Statistic ============
+// 看板卡片的「大数值 + 小单位」两级字号。颜色一律 inherit：
+// 数值色由所在卡片的分档类（stat-good / stat-mag-2 等）决定，此处不写色值。
+.metric-value {
+  // 分档色挂在与卡片同级的 stat-* 类上，从 .t-statistic 一路 inherit 下来不能断
+  .t-statistic,
+  .t-statistic-content {
+    color: inherit;
+  }
+
+  .t-statistic-content-value {
+    font-size: var(--metric-value-size, 26px);
+    font-weight: 600;
+    line-height: 1.2;
+    /* 等宽数字：数据刷新时宽度不跳动 */
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+    color: inherit;
+  }
+
+  .t-statistic-content-unit {
+    font-size: 11px;
+    color: var(--td-text-color-secondary);
+    margin-left: 3px;
+  }
+}
+
+// ============ 状态胶囊 Tag ============
+// 卡片头部的小胶囊：比 size="small" 再收紧一档，形成「标签小、数值大」的对比
+.metric-pill.t-tag {
+  height: 20px;
+  padding: 0 8px;
+  font-size: 11px;
 }

@@ -8,9 +8,13 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     EChart: typeof import('./src/components/EChart/EChart.vue')['default']
+    MetricCard: typeof import('./src/components/usage/MetricCard.vue')['default']
+    MiniBars: typeof import('./src/components/usage/MiniBars.vue')['default']
+    MiniProgress: typeof import('./src/components/usage/MiniProgress.vue')['default']
     PageLayout: typeof import('./src/components/PageLayout/PageLayout.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    ServiceStatusBar: typeof import('./src/components/service/ServiceStatusBar.vue')['default']
     TAlert: typeof import('tdesign-vue-next')['Alert']
     TAside: typeof import('tdesign-vue-next')['Aside']
     TBackTop: typeof import('tdesign-vue-next')['BackTop']
@@ -45,6 +49,7 @@ declare module 'vue' {
     UsageChartCard: typeof import('./src/components/usage/UsageChartCard.vue')['default']
     UsageCompositionCard: typeof import('./src/components/usage/UsageCompositionCard.vue')['default']
     UsageDashboard: typeof import('./src/components/usage/UsageDashboard.vue')['default']
+    UsageHeatmap: typeof import('./src/components/usage/UsageHeatmap.vue')['default']
     UsageRatioCard: typeof import('./src/components/usage/UsageRatioCard.vue')['default']
     UsageSpeedCard: typeof import('./src/components/usage/UsageSpeedCard.vue')['default']
     UsageStatCard: typeof import('./src/components/usage/UsageStatCard.vue')['default']

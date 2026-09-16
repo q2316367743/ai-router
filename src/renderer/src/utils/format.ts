@@ -1,6 +1,6 @@
 import dayjs from 'dayjs'
 
-export { formatTokens } from '@common/utils/format'
+export { formatTokens, tokenParts } from '@common/utils/format'
 
 /** 毫秒时间戳 → HH:mm:ss */
 export function formatTime(ms: number): string {

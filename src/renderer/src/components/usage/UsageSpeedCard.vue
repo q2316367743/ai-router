@@ -2,6 +2,7 @@
   <UsageChartCard
     v-if="option"
     title="模型速度趋势（近七天）"
+    icon="time"
     :hint="SPEED_HINT"
     :option="option"
   />

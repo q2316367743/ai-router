@@ -15,6 +15,7 @@
 | [05-日志代码查看器.md](./app/05-日志代码查看器.md) | 日志代码查看器（2026-09-16）：行展开正文/错误信息改用 Monaco 只读渲染，替换 v-html 与 break-all 大文本方案；动态加载、入口必须用含 contributions 的 root `monaco-editor`（`editor.api` 会报 UNKNOWN service actionWidgetService）、`exports` 映射下的 worker 路径、colors 需带 `#` 而 token rules.foreground 不能带 `#`、tdesign token 主题、空值/高度/多实例销毁约定 |
 | [06-应用图标.md](./app/06-应用图标.md)           | 应用图标（2026-09-16）：图标落点与分工（build 的 png/icns/ico 为不透明满底应用图标；resources/icon.png 为透明底托盘专用机器人图）、尺寸与用途、换图设计约束（托盘图需裁掉留白）、用系统 sips + iconutil + Node 打包 ICO 与用 Pillow 生成托盘图的完整步骤 |
 | [07-开机自启.md](./app/07-开机自启.md)           | 开机自启（2026-09-16）：以系统登录项为唯一权威不落库、未打包禁用以防污染、macOS/Windows 平台差异（macOS 无 args 透传故用 wasOpenedAtLogin、Windows 读写需同 path/args）、登录启动静默驻留托盘（不建窗 + 隐藏 Dock）、app:* IPC 契约、second-instance 唤窗配套 |
+| [09-看板卡片规范.md](./app/09-看板卡片规范.md)   | 看板卡片规范（2026-09-16）：MetricCard 四段解剖（图标+标签+状态胶囊 / 大数值+小单位 / 卡内迷你可视化 / 页脚明细）、卡片底色反转为「比面板底更亮」的浮起层级、迷你图只用真实数据、useUsageCards 配置派生、胶囊文案表、ServiceStatusBar 补齐托盘缺失的服务状态、新指标接入步骤 |
 
 ### data/ —— 数据模型
 

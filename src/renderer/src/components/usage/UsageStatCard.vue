@@ -1,80 +1,50 @@
 <template>
-  <div class="stat-card">
-    <div class="stat-label">{{ label }}</div>
-    <div class="stat-value" :style="{ fontSize: `${valueSize}px` }">{{ value }}</div>
-    <div v-if="hint" class="stat-hint">{{ hint }}</div>
-    <div v-if="tone" class="stat-accent" :class="`tone-${tone}`"></div>
-  </div>
+  <MetricCard
+    :class="config.levelClass"
+    :label="config.label"
+    :icon="config.icon"
+    :pill-text="config.pill?.text"
+    :pill-theme="config.pill?.theme"
+    :footer="config.footer"
+    :value-size="valueSize"
+  >
+    <t-statistic
+      v-if="config.hasValue"
+      :value="config.value"
+      :unit="config.unit"
+      :decimal-places="config.decimalPlaces"
+    />
+    <span v-else class="stat-empty">—</span>
+
+    <!-- v-if 加在具名插槽上：无可视化时整个插槽不注册，卡片不会多出一段空白 -->
+    <template v-if="config.viz" #viz>
+      <MiniBars v-if="config.viz.kind === 'bars'" :values="config.viz.values" />
+      <MiniProgress v-else :percent="config.viz.percent" />
+    </template>
+  </MetricCard>
 </template>
 
 <script lang="ts" setup>
 /**
- * 统计小卡（首页 / 托盘面板共用）：替代此前在多个页面重复粘贴的 .stat-card 样式。
- * value 由调用方格式化（token 用 formatTokens，比例用百分比），组件只管排版与语义色条。
+ * 统计卡（首页 / 托盘面板共用）：把 useUsageCards 的一项配置渲染成看板卡片。
+ *
+ * - 数值走 t-statistic，颜色不在此处指定 —— 由 config.levelClass 设在卡片根节点上，
+ *   经 currentColor 被数值与迷你图继承（色值定义在 assets/style/customer.less）。
+ * - 无数据（零请求下的成功率 / 延迟）渲染占位符而不是「0」，避免把「没有请求」读成「成功率 0%」。
  */
-withDefaults(
-  defineProps<{
-    label: string
-    value: string
-    hint?: string
-    valueSize?: number
-    /** 左侧语义色条（可选）：brand / success / warning / danger */
-    tone?: 'brand' | 'success' | 'warning' | 'danger'
-  }>(),
-  { valueSize: 22, hint: '', tone: undefined }
-)
+import type { UsageCardConfig } from './useUsageCards'
+import MetricCard from './MetricCard.vue'
+import MiniBars from './MiniBars.vue'
+import MiniProgress from './MiniProgress.vue'
+
+withDefaults(defineProps<{ config: UsageCardConfig; valueSize?: number }>(), { valueSize: 26 })
 </script>
 
 <style scoped lang="less">
-.stat-card {
-  position: relative;
-  padding: 12px 14px;
-  border-radius: var(--fluent-radius-card);
-  background: var(--td-bg-color-secondarycontainer);
-  border: 1px solid var(--fluent-border-subtle);
-  overflow: hidden;
-}
-
-.stat-label {
-  font-size: 12px;
-  color: var(--td-text-color-secondary);
-  margin-bottom: 6px;
-}
-
-.stat-value {
+.stat-empty {
+  font-size: var(--metric-value-size, 26px);
   font-weight: 600;
-  color: var(--td-text-color-primary);
   line-height: 1.2;
-}
-
-.stat-hint {
-  margin-top: 4px;
-  font-size: 11px;
   color: var(--td-text-color-placeholder);
-}
-
-/** 语义色条贴在卡片左缘，深浅色下都随 token 变化 */
-.stat-accent {
-  position: absolute;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  width: 3px;
-}
-
-.tone-brand {
-  background: var(--td-brand-color);
-}
-
-.tone-success {
-  background: var(--td-success-color);
-}
-
-.tone-warning {
-  background: var(--td-warning-color);
-}
-
-.tone-danger {
-  background: var(--td-error-color);
 }
 </style>

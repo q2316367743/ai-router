@@ -19,6 +19,52 @@ export interface CompositionSegment {
   tone: 'input' | 'output' | 'cache' | 'unknown'
 }
 
+/** 指标好坏档位（有明确优劣的指标用） */
+export type StatSeverity = 'good' | 'fair' | 'poor'
+
+/** 指标量级档位（无优劣、只比多少的指标用），1 最小 → 4 最大 */
+export type StatMagnitude = 1 | 2 | 3 | 4
+
+/** 请求数量级阈值：<100 / <1k / <10k / ≥10k */
+export const REQUEST_MAGNITUDE_THRESHOLDS: [number, number, number] = [100, 1_000, 10_000]
+
+/** Tokens 数量级阈值：<10k / <100k / <1M / ≥1M */
+export const TOKEN_MAGNITUDE_THRESHOLDS: [number, number, number] = [10_000, 100_000, 1_000_000]
+
+/**
+ * 成功率档位（%）：≥99 好 / ≥95 中 / 其余差。
+ * 无请求时返回 null —— 没有数据就不做好坏判断，展示层据此回落中性色。
+ */
+export function successSeverity(rate: number | null): StatSeverity | null {
+  if (rate === null) return null
+  if (rate >= 99) return 'good'
+  if (rate >= 95) return 'fair'
+  return 'poor'
+}
+
+/**
+ * 平均延迟档位（ms）：<2s 好 / <5s 中 / ≥5s 差。
+ * 阈值比纯网络延迟宽松，因为这里统计的是端到端耗时（含上游预填充与生成时间）。
+ */
+export function latencySeverity(ms: number | null): StatSeverity | null {
+  if (ms === null) return null
+  if (ms < 2_000) return 'good'
+  if (ms < 5_000) return 'fair'
+  return 'poor'
+}
+
+/**
+ * 量级档位：按数量级切 4 档，而非固定绝对值。
+ * 同一份「1000 次请求」在「今天」与「近 30 天」维度下意义完全不同，
+ * 固定阈值会让某个维度恒为最高档，按数量级分档才对「数字大小程度」有可读的区分度。
+ */
+export function magnitudeLevel(value: number, thresholds: [number, number, number]): StatMagnitude {
+  if (value < thresholds[0]) return 1
+  if (value < thresholds[1]) return 2
+  if (value < thresholds[2]) return 3
+  return 4
+}
+
 function emptyOverview(range: UsageRangeKey): UsageOverview {
   return {
     range,

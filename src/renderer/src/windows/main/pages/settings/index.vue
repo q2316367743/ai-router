@@ -1,6 +1,6 @@
 <template>
   <PageLayout title="设置">
-    <div class="p-24px max-w-760px">
+    <div class="p-24px">
       <!-- 外观 -->
       <div class="card">
         <div class="font-500">外观</div>

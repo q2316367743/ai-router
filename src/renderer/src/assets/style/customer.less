@@ -4,7 +4,8 @@
   text-overflow: ellipsis;
 }
 
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
 }
@@ -29,4 +30,76 @@ html, body {
 
 .t-menu {
   border-right: none !important;
+}
+
+/**
+ * 统计数字分档着色：色相承载好坏（success / warning / error），明度承载大小（品牌蓝色阶）。
+ * 阈值与档位判定见 components/usage/useUsageStats.ts，此处只是色值与卡片渐晕。
+ *
+ * 两种用法：
+ * - 纯文字场景（首页状态行）直接绑在数字元素上，只取 color；
+ * - 卡片场景绑在看板卡片根节点（.metric-card），除 color 外还经 --metric-tint
+ *   铺一层右上角淡出的同色渐晕；数值与卡内迷你图都靠 currentColor 继承。
+ *
+ * 语义三档不用语义主色，而是显式取色阶：--td-warning-color 在浅色下是 #ffcc00，
+ * 做文字完全不可读（白底对比 1.6:1）。各档按卡片底（浅 #ffffff / 暗 #201f1e）
+ * 分别取可读的阶位，浅色取暗端、暗色色阶明度反转故取亮端，
+ * 七档在两个主题下均 ≥ 4.5:1（实测 4.5–12.1），与数字字号无关。
+ */
+.metric-card {
+  background-image: radial-gradient(
+    120% 100% at 100% 0%,
+    var(--metric-tint, transparent),
+    transparent 72%
+  );
+}
+
+.stat-good {
+  color: var(--td-success-color-5);
+  --metric-tint: var(--td-success-color-1);
+}
+
+.stat-fair {
+  color: var(--td-warning-color-7);
+  --metric-tint: var(--td-warning-color-1);
+}
+
+.stat-poor {
+  color: var(--td-error-color-5);
+  --metric-tint: var(--td-error-color-1);
+}
+
+.stat-mag-1 {
+  color: var(--td-brand-color-7);
+  --metric-tint: var(--td-brand-color-1);
+}
+
+.stat-mag-2 {
+  color: var(--td-brand-color-8);
+  --metric-tint: var(--td-brand-color-2);
+}
+
+.stat-mag-3 {
+  color: var(--td-brand-color-9);
+  --metric-tint: var(--td-brand-color-3);
+}
+
+.stat-mag-4 {
+  color: var(--td-brand-color-10);
+  --metric-tint: var(--td-brand-color-4);
+}
+
+/* 暗色色阶是浅色的明度反转，可读端在高位阶；量级四档的 -7…-10 两端都可读，无需覆盖 */
+:root[theme-mode='dark'] {
+  .stat-good {
+    color: var(--td-success-color-8);
+  }
+
+  .stat-fair {
+    color: var(--td-warning-color-8);
+  }
+
+  .stat-poor {
+    color: var(--td-error-color-9);
+  }
 }

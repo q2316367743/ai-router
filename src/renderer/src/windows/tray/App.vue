@@ -1,8 +1,13 @@
 <template>
   <div class="panel">
-    <!-- 面板头：拖拽区 + 收起 / 打开主窗口 -->
+    <!-- 面板头：拖拽区 + 运行状态胶囊 + 打开主窗口 -->
     <div class="panel-header">
-      <span class="text-13px font-600">用量统计</span>
+      <div class="flex items-center gap-8px">
+        <span class="text-13px font-600">用量统计</span>
+        <t-tag :theme="statusMeta.theme" variant="light" size="small" shape="round">
+          {{ statusMeta.label }}
+        </t-tag>
+      </div>
       <div class="flex items-center gap-2px no-drag">
         <t-button variant="text" shape="square" size="small" @click="openMain">
           <template #icon>
@@ -30,16 +35,21 @@
  * - 维度只提供 近24小时 / 近七天 / 近30天（「今天」在托盘上与 24 小时高度重合，故不提供）。
  * - 供应商趋势图在 24 小时维度下按供应商分线（对应「24 小时 token 趋势，分为每个供应商的」）。
  * - 面板自身不显示筛选（窄面板放不下），筛选入口在主窗口首页。
+ * - 服务状态只以胶囊形式放在标题栏（复用 useServiceStatus 与首页同源），不显示端点。
  */
+import { computed, onMounted, onUnmounted } from 'vue'
 import { AppIcon } from 'tdesign-icons-vue-next'
 import { useUsageStats } from '@/components/usage/useUsageStats'
 import UsageDashboard from '@/components/usage/UsageDashboard.vue'
 import { useColorMode } from '@/hooks/colorMode'
+import { serviceStatusMeta, useServiceStatus } from '@/hooks/useServiceStatus'
 
 // 初始化主题（含与主窗口的 localStorage 同步）；托盘面板必须显式调用以应用当前深浅色
 useColorMode()
 
 const stats = useUsageStats('last24h')
+const status = useServiceStatus()
+const statusMeta = computed(() => serviceStatusMeta(status.value))
 
 function openMain(): void {
   void window.preload.tray.openMain().then(() => window.preload.tray.hide())
