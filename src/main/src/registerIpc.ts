@@ -1,4 +1,9 @@
 import { registerDbIpc } from '$/db/dbIpc'
+import { registerLogIpc } from '$/ipc/logIpc'
+import { registerModelIpc } from '$/ipc/modelIpc'
+import { registerProviderIpc } from '$/ipc/providerIpc'
+import { registerServiceIpc } from '$/ipc/serviceIpc'
+import { registerUsageIpc } from '$/ipc/usageIpc'
 
 /**
  * IPC 聚合注册点：各业务域的 ipcMain.handle/on 统一在此注册，
@@ -6,4 +11,9 @@ import { registerDbIpc } from '$/db/dbIpc'
  */
 export function registerIpc(): void {
   registerDbIpc()
+  registerProviderIpc()
+  registerModelIpc()
+  registerServiceIpc()
+  registerLogIpc()
+  registerUsageIpc()
 }

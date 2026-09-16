@@ -65,6 +65,11 @@ export function createMainWindow(): BrowserWindow {
     mainWindow?.show()
   })
 
+  // 关窗后置空，避免残留已销毁实例（托盘/Dock 重开依赖）
+  mainWindow.on('closed', () => {
+    mainWindow = null
+  })
+
   // 外部链接交给系统浏览器打开
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
@@ -78,4 +83,14 @@ export function createMainWindow(): BrowserWindow {
   }
 
   return mainWindow
+}
+
+/** 显示主窗口：存活则前置聚焦，已关闭则重建 */
+export function showMainWindow(): void {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.show()
+    mainWindow.focus()
+    return
+  }
+  createMainWindow()
 }

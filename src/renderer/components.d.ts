@@ -7,9 +7,32 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    PageLayout: typeof import('./src/components/PageLayout/PageLayout.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    TAside: typeof import('tdesign-vue-next')['Aside']
+    TBackTop: typeof import('tdesign-vue-next')['BackTop']
     TButton: typeof import('tdesign-vue-next')['Button']
+    TCheckbox: typeof import('tdesign-vue-next')['Checkbox']
+    TContent: typeof import('tdesign-vue-next')['Content']
+    TDateRangePicker: typeof import('tdesign-vue-next')['DateRangePicker']
+    TDescriptions: typeof import('tdesign-vue-next')['Descriptions']
+    TDescriptionsItem: typeof import('tdesign-vue-next')['DescriptionsItem']
+    TForm: typeof import('tdesign-vue-next')['Form']
+    TFormItem: typeof import('tdesign-vue-next')['FormItem']
+    TIcon: typeof import('tdesign-vue-next')['Icon']
+    TInput: typeof import('tdesign-vue-next')['Input']
+    TInputNumber: typeof import('tdesign-vue-next')['InputNumber']
+    TLayout: typeof import('tdesign-vue-next')['Layout']
+    TMenu: typeof import('tdesign-vue-next')['Menu']
+    TMenuItem: typeof import('tdesign-vue-next')['MenuItem']
+    TPopconfirm: typeof import('tdesign-vue-next')['Popconfirm']
+    TRadioButton: typeof import('tdesign-vue-next')['RadioButton']
+    TRadioGroup: typeof import('tdesign-vue-next')['RadioGroup']
+    TSelect: typeof import('tdesign-vue-next')['Select']
+    TSwitch: typeof import('tdesign-vue-next')['Switch']
+    TTable: typeof import('tdesign-vue-next')['Table']
     TTag: typeof import('tdesign-vue-next')['Tag']
+    TTooltip: typeof import('tdesign-vue-next')['Tooltip']
   }
 }

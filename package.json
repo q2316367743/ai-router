@@ -27,13 +27,15 @@
     "@electron-toolkit/utils": "^4.0.0",
     "better-sqlite3": "^13.0.3",
     "drizzle-orm": "^0.45.2",
-    "electron-updater": "^6.3.9"
+    "electron-updater": "^6.3.9",
+    "express": "^5.2.1"
   },
   "devDependencies": {
     "@electron-toolkit/eslint-config-prettier": "3.0.0",
     "@electron-toolkit/eslint-config-ts": "^3.1.0",
     "@electron-toolkit/tsconfig": "^2.0.0",
     "@types/better-sqlite3": "^9.6.0",
+    "@types/express": "^5.0.6",
     "@types/node": "^22.19.1",
     "@typescript-eslint/eslint-plugin": "^8.59.3",
     "@typescript-eslint/parser": "^8.59.3",
