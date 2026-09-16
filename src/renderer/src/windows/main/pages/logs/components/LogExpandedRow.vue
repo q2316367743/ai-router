@@ -3,7 +3,8 @@
     <t-card size="small">
       <template v-if="log" #header>
         <div class="flex items-center gap-8px">
-          <t-tag :theme="isSuccessStatus(log.status) ? 'success' : 'danger'" size="small"
+          <t-tag v-if="isPendingStatus(log.status)" theme="primary" size="small">进行中</t-tag>
+          <t-tag v-else :theme="isSuccessStatus(log.status) ? 'success' : 'danger'" size="small"
             >HTTP {{ log.status }}</t-tag
           >
           <t-tag variant="outline" size="small">POST</t-tag>
@@ -11,6 +12,12 @@
         </div>
       </template>
       <template v-if="log">
+        <t-alert
+          v-if="isPendingStatus(log.status)"
+          theme="info"
+          class="mb-12px"
+          message="请求进行中：状态码、耗时与 token 用量将在响应结束后回填"
+        />
         <t-descriptions :column="4" bordered size="small">
           <t-descriptions-item label="持续时间">{{
             formatDuration(log.durationMs)
@@ -59,7 +66,7 @@
 
         <template v-if="log.error">
           <div class="font-500 mt-16px mb-8px">错误信息</div>
-          <pre class="raw-block">{{ log.error }}</pre>
+          <CodeViewer :value="log.error" language="plaintext" height="200px" />
         </template>
       </template>
       <div v-else-if="!loading" class="text-13px text-td-placeholder">（日志不存在或已被清理）</div>
@@ -68,42 +75,43 @@
 </template>
 
 <script lang="ts" setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import type { RequestLogDetail } from '@common/types'
-import { formatDuration, formatTokens, isSuccessStatus } from '@/utils/format'
+import { formatDuration, formatTokens, isPendingStatus, isSuccessStatus } from '@/utils/format'
 import LogPayloadPanel from './LogPayloadPanel.vue'
+import CodeViewer from './CodeViewer.vue'
 
 const props = defineProps<{
   id: number
+  /** 是否为进行中的请求（详情尚未回填；展开期间请求结束需重新拉取） */
+  pending?: boolean
 }>()
 
 const loading = ref(true)
 const log = ref<RequestLogDetail | null>(null)
 
-onMounted(async () => {
+async function reload(): Promise<void> {
+  loading.value = true
   try {
     log.value = await window.preload.log.getDetail(props.id)
   } finally {
     loading.value = false
   }
-})
+}
+
+onMounted(() => void reload())
+
+// 展开期间请求结束 → 行状态由进行中变为已完成，重新拉取详情以显示回填结果
+watch(
+  () => props.pending,
+  (pending, wasPending) => {
+    if (wasPending && !pending) void reload()
+  }
+)
 </script>
 
 <style lang="less" scoped>
 .mono {
   font-family: 'SF Mono', Menlo, Consolas, monospace;
-}
-
-.raw-block {
-  margin: 0;
-  padding: 12px;
-  border-radius: 6px;
-  background: var(--td-bg-color-component);
-  font-size: 12px;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  word-break: break-all;
-  max-height: 200px;
-  overflow-y: auto;
 }
 </style>

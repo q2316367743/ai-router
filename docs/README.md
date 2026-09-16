@@ -9,19 +9,20 @@
 | 文档                                             | 描述                                                                                                             |
 |--------------------------------------------------|------------------------------------------------------------------------------------------------------------------|
 | [01-init.md](./app/01-init.md)                   | 项目初始化（2026-09-15）：参考 mistrelle 搭建 electron-vite 骨架（main/preload/renderer/common 四段 + windows 多窗口模式）、TDesign + UnoCSS + 自动导入 + Pinia + Vue Router、drizzle + better-sqlite3 数据库基线、db:ping 全链路示例、各配置文件要点与别名约定 |
-| [02-管理界面.md](./app/02-管理界面.md)           | 管理界面（2026-09-15）：侧边栏布局（t-menu 路由导航）、7 个页面职责与数据来源（首页统计看板 + 用量明细表 + 日志页条件分页/行展开详情）、3 组命令式弹窗两文件模式、通用组件目录（PageLayout / EChart / usage）、server:status 状态推送链路 |
+| [02-管理界面.md](./app/02-管理界面.md)           | 管理界面（2026-09-15）：侧边栏布局（t-menu 路由导航）、7 个页面职责与数据来源（首页统计看板 + 用量明细表 + 日志页条件分页/行展开详情/进行中实时展示）、3 组命令式弹窗两文件模式、通用组件目录（PageLayout / EChart / usage）、server:status 状态推送链路、日志页 useLogRefresh 三路刷新（log:changed 推送 + 30s 轮询兜底 + 手动） |
 | [03-托盘.md](./app/03-托盘.md)                   | 系统托盘（2026-09-16）：registerAppTray/refreshTrayUsage 双通道刷新（写库即时 + 30s 兜底）、统计面板弹窗（trayPanel 窗口定位/失焦隐藏/点击竞态抑制）、click 与 right-click 平台分支（macOS 不可同时 setContextMenu）、macOS 标题显示今日用量 |
 | [04-统计看板.md](./app/04-统计看板.md)           | 统计看板（2026-09-16）：用量聚合重构（usage_daily 增加供应商/缓存/成功失败/耗时维度 + usage_hourly 小时表）、统一写入路径 recordRequest、统计口径权威定义表、时间维度解析与活跃度窗口、echarts 图表基元（按需注册 + token 取色）、共享看板组件、首页与托盘面板双端结构 |
+| [05-日志代码查看器.md](./app/05-日志代码查看器.md) | 日志代码查看器（2026-09-16）：行展开正文/错误信息改用 Monaco 只读渲染，替换 v-html 与 break-all 大文本方案；动态加载、入口必须用含 contributions 的 root `monaco-editor`（`editor.api` 会报 UNKNOWN service actionWidgetService）、`exports` 映射下的 worker 路径、colors 需带 `#` 而 token rules.foreground 不能带 `#`、tdesign token 主题、空值/高度/多实例销毁约定 |
 
 ### data/ —— 数据模型
 
 | 文档                                             | 描述                                                                                                             |
 |--------------------------------------------------|------------------------------------------------------------------------------------------------------------------|
-| [01-数据模型.md](./data/01-数据模型.md)          | 6 张表结构（providers/models/settings/request_logs/usage_daily/usage_hourly）、request_logs 全量采集字段（正文/标头/七维 token/请求 ID）与最近 7 天惰性清理策略、用量双粒度聚合表（日永久 + 小时 7 天）与 7 类统计口径、repo 与 IPC 通道清单、@common/types 三端契约组织、新增表流程备忘 |
+| [01-数据模型.md](./data/01-数据模型.md)          | 6 张表结构（providers/models/settings/request_logs/usage_daily/usage_hourly）、request_logs 全量采集字段（正文/标头/七维 token/请求 ID）与**两阶段落库**（startLog 落 pending 行 → recordLog 按 request_id upsert 回填 / 启动收口残留为 499）、最近 7 天惰性清理（按天节流）、用量双粒度聚合表（日永久 + 小时 7 天）与 7 类统计口径、repo 与 IPC 通道清单（含 log:changed 推送）、@common/types 三端契约组织、新增表流程备忘 |
 
 ### server/ —— 本地代理服务
 
 | 文档                                             | 描述                                                                                                             |
 |--------------------------------------------------|------------------------------------------------------------------------------------------------------------------|
-| [01-本地代理服务.md](./server/01-本地代理服务.md) | 127.0.0.1 OpenAI 兼容代理：生命周期（启动/保存重启/退出）、鉴权（Bearer + x-api-key）、显式路由（/v1/models + /v1/chat/completions）、模型映射与同协议纯透传、SSE 流式管道与 usage（含明细）提取、请求/响应正文与标头全量采集（脱敏 + 兜底估算）、OpenAI 风格错误表 |
+| [01-本地代理服务.md](./server/01-本地代理服务.md) | 127.0.0.1 OpenAI 兼容代理：生命周期（启动/保存重启/退出）、鉴权（Bearer + x-api-key）、显式路由（/v1/models + /v1/chat/completions）、模型映射与同协议纯透传、SSE 流式管道与 usage（含明细）提取、请求/响应正文与标头全量采集（**两阶段落库：转发前落 pending 行即时可见「进行中」→ 结束后 upsert 回填**；脱敏 + 兜底估算）、log:changed 实时推送（300ms 合并广播）、OpenAI 风格错误表 |
 | [02-协议适配与转换.md](./server/02-协议适配与转换.md) | 三大接口支持（2026-09-16）：提供商接口类型（OpenAI Chat / OpenAI Responses / Anthropic Messages）、同协议透传 + 异协议经 ai-sdk 中间层双向转换（`src/main/src/server/protocol/`）、SSE 重编码与 reasoning_content 约定、baseUrl 统一为完整 API 根（不补 /v1）、转换路径日志采集口径（usage 明细/dump 正文/上游响应头）、转换路径限制清单 |

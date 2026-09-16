@@ -59,6 +59,8 @@ declare global {
         /** 清空全部日志（保留窗口内） */
         clearAll(): Promise<void>
         todayStats(): Promise<TodayStats>
+        /** 订阅日志变更推送（写库 / 回填后触发），返回退订函数 */
+        onChanged(cb: () => void): () => void
       }
       usage: {
         /** 看板全量统计数据（总计 / 供应商与模型拆分 / 时间序列 / 活跃度） */

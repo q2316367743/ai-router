@@ -12,14 +12,19 @@ export function formatDateTime(ms: number): string {
   return dayjs(ms).format('MM-DD HH:mm:ss')
 }
 
-/** 毫秒 → 秒（两位小数），日志耗时的统一展示口径 */
-export function formatDuration(ms: number): string {
-  return `${(ms / 1000).toFixed(2)}s`
+/** 毫秒 → 秒（两位小数），日志耗时的统一展示口径；进行中（null）显示占位 */
+export function formatDuration(ms: number | null): string {
+  return ms == null ? '-' : `${(ms / 1000).toFixed(2)}s`
 }
 
-/** 2xx（含 200/206/209 等）视为成功 */
-export function isSuccessStatus(status: number): boolean {
-  return status >= 200 && status < 300
+/** 2xx（含 200/206/209 等）视为成功；进行中（null）不算成功 */
+export function isSuccessStatus(status: number | null): boolean {
+  return status != null && status >= 200 && status < 300
+}
+
+/** 状态码为空即请求进行中（pending 行：finishedAt / status / durationMs 均为 null） */
+export function isPendingStatus(status: number | null): boolean {
+  return status == null
 }
 
 /** API Key 脱敏：sk-abcd…wxyz */

@@ -7,6 +7,7 @@ import {
   recordRequest,
   serializeRequestHeaders,
   serializeResponseHeaders,
+  startRequest,
   type TokenUsage
 } from './proxyLog'
 import { forwardConverted } from './protocol/convertHandler'
@@ -131,6 +132,20 @@ export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Pr
   // 日志 path 记上游实际请求路径（而非客户端入口路径）
   const logPath = upstreamPathOf(upstreamUrl)
   const clientStream = parsed['stream'] === true
+
+  // 转发前先落 pending 日志（日志页即时可见「进行中」）；stream 先按客户端意愿预估，
+  // 结束时以实际上游 content-type 判定值回填
+  startRequest({
+    requestId,
+    startedAt,
+    publicModel,
+    providerName: route.providerName,
+    upstreamModel: route.upstreamName,
+    path: logPath,
+    stream: clientStream,
+    requestBody: reqBody,
+    requestHeaders: reqHeaders
+  })
 
   let upstream: Response
   try {

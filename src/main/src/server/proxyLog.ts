@@ -1,5 +1,5 @@
 import type { IncomingHttpHeaders } from 'node:http'
-import { recordLog } from '$/db/repo/logRepo'
+import { recordLog, startLog, type RequestLogStart } from '$/db/repo/logRepo'
 import { accumulateUsage } from '$/db/repo/usageRepo'
 import { refreshTrayUsage } from '$/app/tray'
 
@@ -35,9 +35,24 @@ export interface ProxyLogEntry {
 }
 
 /**
+ * 请求进入转发前先落 pending 行（失败不影响代理服务）：日志页据此立即显示「进行中」。
+ *
+ * 只有走到转发阶段的请求（已路由命中）才落 pending：同步拦截的 400/401/404 直接由
+ * `recordRequest` 单次写入，不留中间态。用量聚合表不在此阶段累加，口径不变。
+ */
+export function startRequest(entry: RequestLogStart): void {
+  try {
+    startLog(entry)
+  } catch {
+    // pending 落库失败不影响代理
+  }
+}
+
+/**
  * 请求落库（失败不影响代理服务）：同一次调用同时写入详细日志与用量聚合表。
  *
- * - 详细日志：request_logs，保留 7 天，供日志页排查。
+ * - 详细日志：request_logs，保留 7 天，供日志页排查；按 requestId upsert，
+ *   已落 pending 行的请求在此回填状态、耗时、token 与正文标头。
  * - 用量聚合：usage_daily / usage_hourly，永久 + 7 天，供统计看板；成功与失败都会计入请求数，
  *   token 只在成功请求时累加（失败请求 usage 为 null，本地拦截的估算值也不应污染 token 统计）。
  * - 提供商未上报用量时基于请求正文估算，计入 unrecognizedTokens（估算只做一次，两处共用）。

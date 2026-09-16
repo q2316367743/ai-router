@@ -3,16 +3,17 @@ export interface RequestLogItem {
   id: number
   /** 请求 ID：每次请求入口生成的 UUID */
   requestId: string
-  /** 请求 / 完成时间（epoch ms） */
+  /** 请求 / 完成时间（epoch ms）；finishedAt 为 null 表示请求进行中 */
   startedAt: number
-  finishedAt: number
+  finishedAt: number | null
   publicModel: string
   providerName: string
   upstreamModel: string
   path: string
-  /** 响应状态码；本地拦截时为 400/401/404/502 等 */
-  status: number
-  durationMs: number
+  /** 响应状态码；本地拦截时为 400/401/404/502 等；null 表示请求进行中 */
+  status: number | null
+  /** 响应耗时（ms）；null 表示请求进行中 */
+  durationMs: number | null
   stream: boolean
   promptTokens: number
   completionTokens: number
@@ -47,7 +48,7 @@ export interface TodayStats {
   totalTokens: number
 }
 
-/** 列表状态筛选口径：成功 = 2xx，失败 = 非 2xx */
+/** 列表状态筛选口径：成功 = 2xx，失败 = 非 2xx 且已结束；进行中（status 为 null）只在 all 下出现 */
 export type LogStatusFilter = 'all' | 'success' | 'fail'
 
 /** 日志列表查询参数（跨保留窗口按时间倒序分页；provider/model 为 null 表示不筛选） */

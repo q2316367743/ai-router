@@ -5,10 +5,9 @@
       <span class="text-13px font-600">用量统计</span>
       <div class="flex items-center gap-2px no-drag">
         <t-button variant="text" shape="square" size="small" @click="openMain">
-          <template #icon><t-icon name="app" /></template>
-        </t-button>
-        <t-button variant="text" shape="square" size="small" @click="hide">
-          <template #icon><t-icon name="close" /></template>
+          <template #icon>
+            <app-icon />
+          </template>
         </t-button>
       </div>
     </div>
@@ -32,7 +31,7 @@
  * - 供应商趋势图在 24 小时维度下按供应商分线（对应「24 小时 token 趋势，分为每个供应商的」）。
  * - 面板自身不显示筛选（窄面板放不下），筛选入口在主窗口首页。
  */
-import { onMounted, onUnmounted } from 'vue'
+import { AppIcon } from 'tdesign-icons-vue-next'
 import { useUsageStats } from '@/components/usage/useUsageStats'
 import UsageDashboard from '@/components/usage/UsageDashboard.vue'
 import { useColorMode } from '@/hooks/colorMode'
@@ -41,10 +40,6 @@ import { useColorMode } from '@/hooks/colorMode'
 useColorMode()
 
 const stats = useUsageStats('last24h')
-
-function hide(): void {
-  void window.preload.tray.hide()
-}
 
 function openMain(): void {
   void window.preload.tray.openMain().then(() => window.preload.tray.hide())

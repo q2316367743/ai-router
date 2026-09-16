@@ -10,10 +10,11 @@
     <div class="display-area">
       <template v-if="mode === 'body'">
         <JsonView v-if="showJsonView" :text="body" />
-        <pre v-else-if="body" class="raw-block">{{ body }}</pre>
-        <div v-else class="text-13px text-td-placeholder p-12px">（空）</div>
+        <CodeViewer v-else :value="body" language="plaintext" height="100%" />
       </template>
-      <LogHeaders v-else :headers-json="headersJson" />
+      <div v-else class="headers-scroll">
+        <LogHeaders :headers-json="headersJson" />
+      </div>
     </div>
   </div>
 </template>
@@ -22,6 +23,7 @@
 import { computed, ref } from 'vue'
 import JsonView from './JsonView.vue'
 import LogHeaders from './LogHeaders.vue'
+import CodeViewer from './CodeViewer.vue'
 
 type PanelMode = 'body' | 'headers'
 
@@ -43,19 +45,16 @@ function onModeChange(value: string | number | boolean): void {
 
 <style lang="less" scoped>
 .display-area {
+  flex: 1;
+  min-height: 0;
   border: 1px solid var(--fluent-border-subtle);
   border-radius: 6px;
   background: var(--td-bg-color-component);
-  max-height: 360px;
-  overflow-y: auto;
+  overflow: hidden;
 }
 
-.raw-block {
-  margin: 0;
-  padding: 12px;
-  font-size: 12px;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  word-break: break-all;
+.headers-scroll {
+  height: 100%;
+  overflow-y: auto;
 }
 </style>

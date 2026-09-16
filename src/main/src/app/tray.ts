@@ -43,8 +43,8 @@ export function refreshTrayUsage(): void {
 /** 托盘右键菜单模板（linux 作为主菜单） */
 function menuTemplate(): MenuItemConstructorOptions[] {
   return [
-    { label: '打开统计面板', click: () => tray && toggleTrayPanel(tray.getBounds()) },
     { label: '打开主窗口', click: showMainWindow },
+    { label: '打开统计面板', click: () => tray && toggleTrayPanel(tray.getBounds()) },
     { type: 'separator' },
     { label: '退出', click: () => app.quit() }
   ]

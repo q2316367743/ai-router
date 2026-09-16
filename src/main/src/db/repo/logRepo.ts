@@ -1,4 +1,4 @@
-import { and, between, eq, gt, lt, or, sql } from 'drizzle-orm'
+import { and, between, eq, gt, isNotNull, isNull, lt, or, sql } from 'drizzle-orm'
 import type {
   LogFilterOptions,
   LogListQuery,
@@ -14,6 +14,32 @@ import { dateKey, todayKey } from '../../utils/date'
 const RETENTION_DAYS = 7
 
 export type RequestLogEntry = Omit<RequestLogDetail, 'id' | 'logDate'>
+/** pending 行入参：结束阶段才可知的字段全部缺省（由 recordLog 回填） */
+export type RequestLogStart = Pick<
+  RequestLogEntry,
+  'requestId' | 'startedAt' | 'publicModel' | 'providerName' | 'upstreamModel' | 'path' | 'stream'
+> &
+  Partial<Pick<RequestLogEntry, 'requestHeaders' | 'requestBody'>>
+
+/** 写入观察者：日志落库 / 回填后触发（供 IPC 广播实时推送，db 层不依赖 electron） */
+type LogWrittenListener = () => void
+const writtenListeners = new Set<LogWrittenListener>()
+
+/** 订阅日志写入事件，返回退订函数 */
+export function onLogWritten(listener: LogWrittenListener): () => void {
+  writtenListeners.add(listener)
+  return () => writtenListeners.delete(listener)
+}
+
+function notifyWritten(): void {
+  for (const listener of writtenListeners) {
+    try {
+      listener()
+    } catch {
+      // 推送失败不影响落库
+    }
+  }
+}
 
 /** 列表查询的轻量投影（不含正文与标头） */
 const listColumns = {
@@ -38,26 +64,90 @@ const listColumns = {
   error: requestLogs.error
 }
 
-/** 写入日志（logDate 由请求时间推导）；写入前惰性清理超窗日志 */
-export function recordLog(entry: RequestLogEntry): void {
-  cleanupExpiredLogs()
-  db()
-    .insert(requestLogs)
-    .values({ ...entry, logDate: dateKey(entry.startedAt) })
-    .run()
+/** 最近一次执行过期清理的日期键：把「每请求一次 DELETE」降为「每天一次」 */
+let lastCleanupDate: string | null = null
+
+/**
+ * 落一条 pending 日志（请求进入转发前调用）：只写请求侧已知字段，
+ * finished_at / status / duration_ms 留 null 表示进行中，正文与标头等结束阶段回填。
+ */
+export function startLog(entry: RequestLogStart): void {
+  try {
+    cleanupExpiredLogs()
+    db()
+      .insert(requestLogs)
+      .values({
+        requestId: entry.requestId,
+        logDate: dateKey(entry.startedAt),
+        startedAt: entry.startedAt,
+        publicModel: entry.publicModel,
+        providerName: entry.providerName,
+        upstreamModel: entry.upstreamModel,
+        path: entry.path,
+        stream: entry.stream,
+        requestHeaders: entry.requestHeaders ?? null,
+        requestBody: entry.requestBody ?? null
+      })
+      .run()
+  } catch {
+    // pending 落库失败不影响代理；结束阶段 upsert 会补一条完整记录
+  }
+  notifyWritten()
 }
 
-/** 清理超出保留窗口（RETENTION_DAYS 天前）的日志 */
+/**
+ * 写入日志（logDate 由请求时间推导）。
+ *
+ * 以 request_id 为键 upsert：已由 startLog 落过 pending 行的请求回填状态与正文；
+ * 同步拦截分支（401/400/404 等，未走 startLog）无匹配行时直接插入，与单阶段写入等价。
+ */
+export function recordLog(entry: RequestLogEntry): void {
+  cleanupExpiredLogs()
+  const { requestId, startedAt, ...rest } = entry
+  db()
+    .insert(requestLogs)
+    .values({ requestId, startedAt, ...rest, logDate: dateKey(startedAt) })
+    .onConflictDoUpdate({ target: requestLogs.requestId, set: rest })
+    .run()
+  notifyWritten()
+}
+
+/** 清理超出保留窗口（RETENTION_DAYS 天前）的日志；按天节流，同一天内重复调用直接返回 */
 export function cleanupExpiredLogs(): void {
+  const today = todayKey()
+  if (lastCleanupDate === today) return
+  lastCleanupDate = today
   const boundary = dateKey(Date.now() - (RETENTION_DAYS - 1) * 24 * 60 * 60 * 1000)
   db().delete(requestLogs).where(lt(requestLogs.logDate, boundary)).run()
 }
 
-/** 组合列表筛选条件（成功 = 2xx，失败 = 非 2xx；provider/model 精确匹配） */
+/**
+ * 标记残留的进行中日志为「服务中断」。
+ *
+ * 应用退出 / 崩溃时已落 pending 但未回填的行会永远停在进行中，启动时统一收口为 499。
+ * 这些请求从未写入用量聚合表（聚合只在结束时累加），因此日志条数会略多于统计请求数。
+ */
+export function markPendingInterrupted(): void {
+  const now = Date.now()
+  db()
+    .update(requestLogs)
+    .set({
+      status: 499,
+      finishedAt: now,
+      durationMs: sql`${now} - ${requestLogs.startedAt}`,
+      error: '服务中断'
+    })
+    .where(isNull(requestLogs.finishedAt))
+    .run()
+}
+
+/** 组合列表筛选条件（成功 = 2xx，失败 = 非 2xx 且已结束；provider/model 精确匹配） */
 function listWhere(query: LogListQuery) {
   return and(
     query.status === 'success' ? between(requestLogs.status, 200, 299) : undefined,
-    query.status === 'fail' ? or(lt(requestLogs.status, 200), gt(requestLogs.status, 299)) : undefined,
+    query.status === 'fail'
+      ? and(isNotNull(requestLogs.status), or(lt(requestLogs.status, 200), gt(requestLogs.status, 299)))
+      : undefined,
     query.provider ? eq(requestLogs.providerName, query.provider) : undefined,
     query.model ? eq(requestLogs.publicModel, query.model) : undefined
   )

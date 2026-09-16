@@ -3,7 +3,7 @@ import type { LanguageModelUsage } from 'ai'
 import type { ServerResponse } from 'node:http'
 import type { MappingRoute } from '$/db/repo/modelRepo'
 import { errMsg, sendOpenAiError } from '../httpRespond'
-import { recordRequest, type TokenUsage } from '../proxyLog'
+import { recordRequest, startRequest, type TokenUsage } from '../proxyLog'
 import { parseChatPrompt } from './chatRequest'
 import {
   createChunkWriter,
@@ -59,6 +59,19 @@ export async function forwardConverted(options: ForwardConvertedOptions): Promis
   const { body, res, route, publicModel, requestId, startedAt, reqBody, reqHeaders, extraHeaders } = options
   // 日志 path 记上游实际请求路径（而非客户端入口路径）
   const logPath = upstreamPathOf(joinConvertUrl(route.providerBaseUrl, route.providerProtocol))
+  // 转发前先落 pending 日志（日志页即时可见「进行中」）；stream 由原始 body 判定，
+  // 与请求解析成败无关，结束时以实际下发形态回填
+  startRequest({
+    requestId,
+    startedAt,
+    publicModel,
+    providerName: route.providerName,
+    upstreamModel: route.upstreamName,
+    path: logPath,
+    stream: isRecord(body) && body['stream'] === true,
+    requestBody: reqBody,
+    requestHeaders: reqHeaders
+  })
   const log = (outcome: ConvertOutcome): void => {
     recordRequest({
       path: logPath,
@@ -346,4 +359,8 @@ function stableJson(input: unknown): string {
   if (typeof input === 'string') return input
   if (input == null) return '{}'
   return JSON.stringify(input)
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
 }

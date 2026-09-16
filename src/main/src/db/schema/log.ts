@@ -1,24 +1,29 @@
-import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
-/** 请求详细日志：保留最近 7 天，logRepo 惰性清理（DELETE log_date < 窗口边界日） */
+/**
+ * 请求详细日志：保留最近 7 天，logRepo 惰性清理（DELETE log_date < 窗口边界日）。
+ *
+ * 两阶段落库：请求进入转发前先 startLog 落一行 pending（finished_at / status / duration_ms 为 null），
+ * 响应结束后 recordLog 以 request_id 为键回填。null 即「进行中」，不用哨兵值以免污染筛选口径。
+ */
 export const requestLogs = sqliteTable(
   'request_logs',
   {
     id: integer('id').primaryKey({ autoIncrement: true }),
-    /** 请求 ID：每次请求入口生成的 UUID，用于关联排查 */
+    /** 请求 ID：每次请求入口生成的 UUID，同时是 pending 行回填的关联键（唯一索引） */
     requestId: text('request_id').notNull(),
     /** 日志归属日期（YYYY-MM-DD，由请求时间推导），清理依据 */
     logDate: text('log_date').notNull(),
-    /** 请求 / 完成时间（epoch ms） */
+    /** 请求 / 完成时间（epoch ms）；finished_at 为 null 表示请求进行中 */
     startedAt: integer('started_at').notNull(),
-    finishedAt: integer('finished_at').notNull(),
+    finishedAt: integer('finished_at'),
     publicModel: text('public_model').notNull(),
     providerName: text('provider_name').notNull(),
     upstreamModel: text('upstream_model').notNull(),
     path: text('path').notNull(),
-    /** 响应状态码；本地拦截时为 400/401/404/502 等 */
-    status: integer('status').notNull(),
-    durationMs: integer('duration_ms').notNull(),
+    /** 响应状态码；本地拦截时为 400/401/404/502 等；null 表示请求进行中 */
+    status: integer('status'),
+    durationMs: integer('duration_ms'),
     stream: integer('stream', { mode: 'boolean' }).notNull().default(false),
     promptTokens: integer('prompt_tokens').notNull().default(0),
     completionTokens: integer('completion_tokens').notNull().default(0),
@@ -38,5 +43,8 @@ export const requestLogs = sqliteTable(
     responseHeaders: text('response_headers'),
     error: text('error')
   },
-  (t) => [index('idx_request_logs_date').on(t.logDate)]
+  (t) => [
+    index('idx_request_logs_date').on(t.logDate),
+    uniqueIndex('idx_request_logs_request_id').on(t.requestId)
+  ]
 )

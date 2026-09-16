@@ -53,11 +53,17 @@
       >
         <template #time="{ row }">{{ formatDateTime(row.startedAt) }}</template>
         <template #status="{ row }">
-          <span
-            class="status-dot"
-            :class="isSuccessStatus(row.status) ? 'dot-ok' : 'dot-fail'"
-          ></span
-          >{{ row.status }}
+          <template v-if="isPendingStatus(row.status)">
+            <t-loading size="12px" class="mr-6px align-middle" />
+            <span class="text-td-brand">进行中</span>
+          </template>
+          <template v-else>
+            <span
+              class="status-dot"
+              :class="isSuccessStatus(row.status) ? 'dot-ok' : 'dot-fail'"
+            ></span
+            >{{ row.status }}
+          </template>
         </template>
         <template #streamCell="{ row }">
           <t-tag v-if="row.stream" variant="outline" size="small">流式</t-tag>
@@ -70,7 +76,10 @@
           </div>
         </template>
         <template #tokens="{ row }">
-          <t-tooltip :content="tokensTooltip(row)">
+          <span v-if="isPendingStatus(row.status)" class="text-13px text-td-placeholder"
+            >等待响应</span
+          >
+          <t-tooltip v-else :content="tokensTooltip(row)">
             <div>
               <div>
                 入 {{ formatTokens(row.promptTokens) }} · 出
@@ -83,9 +92,14 @@
             </div>
           </t-tooltip>
         </template>
-        <template #duration="{ row }">{{ formatDuration(row.durationMs) }}</template>
+        <template #duration="{ row }">
+          <span v-if="isPendingStatus(row.status)" class="text-td-brand">
+            {{ formatElapsed(now - row.startedAt) }}
+          </span>
+          <span v-else>{{ formatDuration(row.durationMs) }}</span>
+        </template>
         <template #expanded-row="{ row }">
-          <LogExpandedRow :id="row.id" />
+          <LogExpandedRow :id="row.id" :pending="isPendingStatus(row.status)" />
         </template>
       </t-table>
     </div>
@@ -95,19 +109,16 @@
 <script lang="ts" setup>
 import type { PageInfo } from 'tdesign-vue-next'
 import type { LogStatusFilter, RequestLogItem } from '@common/types'
-import { formatDateTime, formatDuration, formatTokens, isSuccessStatus } from '@/utils/format'
+import { formatDateTime, formatDuration, formatTokens, isPendingStatus, isSuccessStatus } from '@/utils/format'
 import PageLayout from '@/components/PageLayout/PageLayout.vue'
 import LogExpandedRow from './components/LogExpandedRow.vue'
+import { useLogRefresh } from './useLogRefresh'
 import { MessageUtil } from '@/utils/modal'
 
 const PAGE_SIZE = 25
-const REFRESH_INTERVAL = 30_000
 
 type SelectOption = { label: string; value: string }
 
-const list = ref<RequestLogItem[]>([])
-const total = ref(0)
-const loading = ref(false)
 const autoRefresh = ref(true)
 const status = ref<LogStatusFilter>('all')
 const provider = ref<string>('')
@@ -117,16 +128,27 @@ const expandedKeys = ref<Array<string | number>>([])
 const providerOptions = ref<SelectOption[]>([])
 const modelOptions = ref<SelectOption[]>([])
 
-let timer: ReturnType<typeof setInterval> | null = null
-
 const columns = [
   { colKey: 'time', title: '时间', width: 130 },
-  { colKey: 'status', title: '状态', width: 80 },
+  { colKey: 'status', title: '状态', width: 90 },
   { colKey: 'streamCell', title: '流式', width: 80 },
   { colKey: 'model', title: '模型', minWidth: 210 },
   { colKey: 'tokens', title: 'Token', width: 180 },
-  { colKey: 'duration', title: '持续时间', width: 90 }
+  { colKey: 'duration', title: '持续时间', width: 100 }
 ]
+
+// 取数 / 推送订阅 / 进行中计时统一由 hook 管理
+const { list, total, loading, now, refresh } = useLogRefresh({
+  buildQuery: () => ({
+    status: status.value,
+    provider: provider.value || null,
+    model: model.value || null,
+    page: page.value,
+    pageSize: PAGE_SIZE
+  }),
+  autoRefresh,
+  page
+})
 
 const pagination = computed(() => ({
   current: page.value,
@@ -135,25 +157,13 @@ const pagination = computed(() => ({
   showJumper: true
 }))
 
-function tokensTooltip(row: RequestLogItem): string {
-  return `输入 ${row.promptTokens} · 输出 ${row.completionTokens} · 思考 ${row.reasoningTokens} · 缓存读 ${row.cacheReadTokens} · 缓存写 ${row.cacheWriteTokens} · 估算 ${row.unrecognizedTokens} · 总计 ${row.totalTokens}`
+/** 进行中耗时的秒级展示（保留一位小数，与已完成行的两位小数区分） */
+function formatElapsed(ms: number): string {
+  return `${(Math.max(0, ms) / 1000).toFixed(1)}s`
 }
 
-async function refresh(): Promise<void> {
-  loading.value = true
-  try {
-    const result = await window.preload.log.list({
-      status: status.value,
-      provider: provider.value || null,
-      model: model.value || null,
-      page: page.value,
-      pageSize: PAGE_SIZE
-    })
-    list.value = result.items
-    total.value = result.total
-  } finally {
-    loading.value = false
-  }
+function tokensTooltip(row: RequestLogItem): string {
+  return `输入 ${row.promptTokens} · 输出 ${row.completionTokens} · 思考 ${row.reasoningTokens} · 缓存读 ${row.cacheReadTokens} · 缓存写 ${row.cacheWriteTokens} · 估算 ${row.unrecognizedTokens} · 总计 ${row.totalTokens}`
 }
 
 async function loadOptions(): Promise<void> {
@@ -197,17 +207,6 @@ watch(model, () => {
 
 onMounted(() => {
   void loadOptions()
-  void refresh()
-  timer = setInterval(() => {
-    if (autoRefresh.value) void refresh()
-  }, REFRESH_INTERVAL)
-})
-
-onUnmounted(() => {
-  if (timer) {
-    clearInterval(timer)
-    timer = null
-  }
 })
 </script>
 
