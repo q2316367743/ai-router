@@ -13,7 +13,7 @@
 | [03-托盘.md](./app/03-托盘.md)                   | 系统托盘（2026-09-16）：registerAppTray/refreshTrayUsage 双通道刷新（写库即时 + 30s 兜底）、统计面板弹窗（trayPanel 窗口定位/失焦隐藏/点击竞态抑制）、click 与 right-click 平台分支（macOS 不可同时 setContextMenu）、macOS 标题显示今日用量 |
 | [04-统计看板.md](./app/04-统计看板.md)           | 统计看板（2026-09-16）：用量聚合重构（usage_daily 增加供应商/缓存/成功失败/耗时维度 + usage_hourly 小时表）、统一写入路径 recordRequest、统计口径权威定义表、时间维度解析与活跃度窗口、echarts 图表基元（按需注册 + token 取色）、共享看板组件、首页与托盘面板双端结构 |
 | [05-日志代码查看器.md](./app/05-日志代码查看器.md) | 日志代码查看器（2026-09-16）：行展开正文/错误信息改用 Monaco 只读渲染，替换 v-html 与 break-all 大文本方案；动态加载、入口必须用含 contributions 的 root `monaco-editor`（`editor.api` 会报 UNKNOWN service actionWidgetService）、`exports` 映射下的 worker 路径、colors 需带 `#` 而 token rules.foreground 不能带 `#`、tdesign token 主题、空值/高度/多实例销毁约定 |
-| [06-应用图标.md](./app/06-应用图标.md)           | 应用图标（2026-09-16）：四份图标落点（build 的 png/icns/ico + resources/icon.png 托盘）、尺寸与用途、正方形满底无 alpha 约定、换图设计约束，以及用系统 sips + iconutil + Node 打包 ICO 的完整重新生成步骤 |
+| [06-应用图标.md](./app/06-应用图标.md)           | 应用图标（2026-09-16）：图标落点与分工（build 的 png/icns/ico 为不透明满底应用图标；resources/icon.png 为透明底托盘专用机器人图）、尺寸与用途、换图设计约束（托盘图需裁掉留白）、用系统 sips + iconutil + Node 打包 ICO 与用 Pillow 生成托盘图的完整步骤 |
 | [07-开机自启.md](./app/07-开机自启.md)           | 开机自启（2026-09-16）：以系统登录项为唯一权威不落库、未打包禁用以防污染、macOS/Windows 平台差异（macOS 无 args 透传故用 wasOpenedAtLogin、Windows 读写需同 path/args）、登录启动静默驻留托盘（不建窗 + 隐藏 Dock）、app:* IPC 契约、second-instance 唤窗配套 |
 
 ### data/ —— 数据模型
