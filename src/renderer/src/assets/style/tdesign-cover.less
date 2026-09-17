@@ -590,6 +590,47 @@
   }
 }
 
+// Fluent 分段控件：挂在 t-radio-group 上，配合 variant="default-filled" 使用。
+//
+// 该变体自带「轨道 + 滑动缩略块」结构（.t-radio-group__bg-block 由组件按选中项算 left/width
+// 并带过渡，滑动是白送的），但两处表面是不透明色阶，在半透明容器上会糊出实色块，故换掉：
+// - 轨道：--td-bg-color-component（不透明灰）→ 半透明暗色洗，两种主题下都比底「暗一档」；
+// - 缩略块：--td-bg-color-container-select（实白 / 暗色 #605e5c）→ --fluent-card-bg，
+//   托盘面板会把该 token 重定向成玻璃卡片底，于是缩略块与看板卡片同一套「底 + 描边 + 阴影」。
+// 层级语义保持不变：轨道比底暗、缩略块比底亮，控件仍比所在底更实。
+// 文字色沿用 TDesign 自带（未选中次要色 / 选中主色），不重复声明。
+.fluent-segmented {
+  // TDesign 的轨道选择器是 .t-radio-group.t-radio-group--filled（0,2,0），单类压不过
+  background-color: color-mix(in srgb, var(--td-gray-color-14) 8%, transparent) !important;
+  border-radius: var(--fluent-radius-smooth) !important;
+
+  // 段间 1px 竖线：窄控件里是噪音，Fluent 分段控件不画
+  .t-radio-button::before {
+    opacity: 0 !important;
+  }
+
+  .t-radio-group__bg-block {
+    background-color: var(--fluent-card-bg) !important;
+    border-radius: calc(var(--fluent-radius-smooth) - 2px) !important;
+    // 描边必须走 inset 阴影：缩略块宽度由 TDesign 按选中项的 offsetWidth 算出，
+    // 实边框会改盒模型宽度导致缩略块与文字错位
+    box-shadow: inset 0 0 0 1px var(--fluent-card-border), var(--fluent-elevation-1);
+  }
+}
+
+// 等宽铺满（托盘窄面板）：三段平分一行，避免左对齐后右侧空一大截。
+// 重复类名是为了压过 TDesign 的 .t-radio-group（inline-flex + width: fit-content，0,1,0）。
+.fluent-segmented.fluent-segmented--block {
+  display: flex;
+  flex-wrap: nowrap;
+  width: 100%;
+
+  .t-radio-button {
+    flex: 1;
+    justify-content: center;
+  }
+}
+
 
 .t-default-menu, .t-layout__sider, .t-layout, .t-tabs, .t-layout__header, .t-tabs__operations {
   background-color: transparent !important;

@@ -1,8 +1,14 @@
 <template>
   <div class="dashboard">
-    <!-- 维度切换 + 筛选 -->
+    <!-- 维度切换（.fluent-segmented：Fluent 分段控件，见 assets/style/tdesign-cover.less）+ 筛选 -->
     <div class="flex items-center justify-between gap-8px mb-12px flex-wrap">
-      <t-radio-group v-model="range" variant="outline" size="small">
+      <t-radio-group
+        v-model="range"
+        class="fluent-segmented"
+        :class="{ 'fluent-segmented--block': compact }"
+        variant="default-filled"
+        size="small"
+      >
         <t-radio-button v-for="item in rangeOptions" :key="item.value" :value="item.value">
           {{ item.label }}
         </t-radio-button>
@@ -27,7 +33,8 @@
       </div>
     </div>
 
-    <t-loading :loading="loading" size="small">
+    <!-- delay 抑制快速请求的闪烁；托盘紧凑模式下不盖遮罩（面板底是亚克力，遮罩会整块盖住） -->
+    <t-loading :loading="loading" :show-overlay="!compact" :delay="200" size="small">
       <div class="flex flex-col gap-12px">
         <!-- 请求数 / 成功率 / 平均延迟 / 总 tokens（窄面板下 2 列两行，避免挤压） -->
         <div class="grid gap-10px" :class="compact ? 'grid-cols-2' : 'grid-cols-4'">
@@ -116,7 +123,7 @@ const props = withDefaults(
     showFilters?: boolean
     /** 是否展示模型速度折线（固定近七天，仅主窗口首页开启） */
     showSpeed?: boolean
-    /** 紧凑模式（托盘窄面板） */
+    /** 紧凑模式（托盘窄面板）：图表压矮、统计卡两列、维度切换等宽铺满 */
     compact?: boolean
   }>(),
   {
