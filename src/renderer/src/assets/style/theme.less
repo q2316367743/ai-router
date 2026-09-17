@@ -130,8 +130,9 @@
   --td-scrollbar-color: rgba(0, 0, 0, 0.2);
   --td-scrollbar-hover-color: rgba(0, 0, 0, 0.4);
   --td-scroll-track-color: #f3f2f1;
-  --fluent-acrylic-bg: rgba(255, 255, 255, 0.85);
-  --fluent-acrylic-bg-dark: rgba(32, 31, 30, 0.85);
+  /* 亚克力叠加层（仅托盘面板消费）：0.6 才让主进程原生材质透出来，卡片再叠一层玻璃卡片底 */
+  --fluent-acrylic-bg: rgba(255, 255, 255, 0.6);
+  --fluent-acrylic-card-bg: rgba(255, 255, 255, 0.5);
   --fluent-acrylic-blur: blur(20px) saturate(125%);
   --fluent-elevation-1: 0 2px 4px rgba(0, 0, 0, 0.04);
   --fluent-elevation-2: 0 4px 8px rgba(0, 0, 0, 0.08);
@@ -297,8 +298,9 @@
   --td-scrollbar-color: rgba(255, 255, 255, 0.2);
   --td-scrollbar-hover-color: rgba(255, 255, 255, 0.4);
   --td-scroll-track-color: #201f1e;
-  --fluent-acrylic-bg: rgba(32, 31, 30, 0.85);
-  --fluent-acrylic-bg-dark: rgba(32, 31, 30, 0.85);
+  --fluent-acrylic-bg: rgba(32, 31, 30, 0.6);
+  /* 暗色玻璃卡片靠一层白色薄膜抬升（比面板底更亮），描边与阴影沿用 --fluent-card-* */
+  --fluent-acrylic-card-bg: rgba(255, 255, 255, 0.08);
   --fluent-acrylic-blur: blur(20px) saturate(125%);
   --fluent-elevation-1: 0 2px 4px rgba(0, 0, 0, 0.2);
   --fluent-elevation-2: 0 4px 8px rgba(0, 0, 0, 0.3);

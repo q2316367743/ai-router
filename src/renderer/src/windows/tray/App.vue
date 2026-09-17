@@ -72,8 +72,14 @@ onUnmounted(() => {
 <style scoped lang="less">
 /**
  * 面板外层用 --fluent-acrylic-bg 做半透明底，配合主进程 vibrancy / acrylic 生效。
+ *
+ * 面板作用域内重定向表面 token（CSS 变量随 DOM 继承到面板里所有看板卡片，不泄漏到主窗口）：
+ * - --fluent-card-bg → 玻璃卡片底：卡片也是半透明，面板的亚克力才透得上来；
+ * - --metric-tint-alpha：分档渐晕是不透明色阶，跟着降透明度才不在卡片角落糊出实色块。
  */
 .panel {
+  --fluent-card-bg: var(--fluent-acrylic-card-bg);
+  --metric-tint-alpha: 60%;
   display: flex;
   flex-direction: column;
   height: 100vh;

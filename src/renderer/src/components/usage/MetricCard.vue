@@ -60,13 +60,17 @@ withDefaults(
 </script>
 
 <style scoped lang="less">
-/** 底色用内容容器（白）+ 阴影：卡片比面板底更亮才是「浮起」，反过来的层级会显平 */
+/**
+ * 底色用卡片面 token + 阴影：卡片比面板底更亮才是「浮起」，反过来的层级会显平。
+ * --fluent-card-bg 的缺省值（0.7 白 / 0.7 的 #201f1e）在不透明容器上合成结果与原色一致，
+ * 但窗口可以整体重定向它：托盘面板即把面板内的卡片指向玻璃卡片底（见 windows/tray/App.vue）。
+ */
 .metric-card {
   position: relative;
   padding: 14px 16px;
   border-radius: var(--fluent-radius-card);
   /* 用 background-color 而非 background 简写：简写会把分档渐晕的 background-image 重置掉 */
-  background-color: var(--td-bg-color-container);
+  background-color: var(--fluent-card-bg, var(--td-bg-color-container));
   border: 1px solid var(--fluent-card-border);
   box-shadow: var(--fluent-card-shadow);
   overflow: hidden;

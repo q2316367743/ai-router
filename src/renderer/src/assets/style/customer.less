@@ -41,6 +41,9 @@ body {
  * - 卡片场景绑在看板卡片根节点（.metric-card），除 color 外还经 --metric-tint
  *   铺一层右上角淡出的同色渐晕；数值与卡内迷你图都靠 currentColor 继承。
  *
+ * 渐晕取的是不透明色阶，铺在半透明卡片上会在右上角糊出一块实色，故经 --metric-tint-alpha
+ * （默认 100%，即不透明底色下的现状）在 color-mix 里降透明度，半透明卡片场景调低即可。
+ *
  * 语义三档不用语义主色，而是显式取色阶：--td-warning-color 在浅色下是 #ffcc00，
  * 做文字完全不可读（白底对比 1.6:1）。各档按卡片底（浅 #ffffff / 暗 #201f1e）
  * 分别取可读的阶位，浅色取暗端、暗色色阶明度反转故取亮端，
@@ -49,7 +52,7 @@ body {
 .metric-card {
   background-image: radial-gradient(
     120% 100% at 100% 0%,
-    var(--metric-tint, transparent),
+    color-mix(in srgb, var(--metric-tint, transparent) var(--metric-tint-alpha, 100%), transparent),
     transparent 72%
   );
 }
