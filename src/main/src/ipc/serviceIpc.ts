@@ -12,7 +12,16 @@ export function registerServiceIpc(): void {
     if (!Number.isInteger(config.port) || config.port < 1 || config.port > 65535) {
       throw new Error('端口必须是 1-65535 的整数')
     }
-    saveServiceConfig(config)
+    const proxyUrl = typeof config.proxyUrl === 'string' ? config.proxyUrl.trim() : ''
+    if (proxyUrl) {
+      try {
+        const parsed = new URL(proxyUrl)
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new Error('bad protocol')
+      } catch {
+        throw new Error('代理地址必须是合法的 http(s) URL')
+      }
+    }
+    saveServiceConfig({ ...config, proxyUrl })
     await restartProxyServer()
     return getServerStatus()
   })

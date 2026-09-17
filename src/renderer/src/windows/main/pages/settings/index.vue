@@ -29,6 +29,31 @@
           />
         </div>
       </div>
+
+      <!-- 网络代理 -->
+      <div class="card mt-12px">
+        <div class="font-500">网络代理</div>
+        <div class="text-13px text-td-secondary mt-4px mb-12px">
+          上游请求经 HTTP(S) 代理转发（CONNECT 隧道），留空直连；保存后立即生效
+        </div>
+        <div class="flex items-center gap-8px">
+          <t-input
+            v-model="proxyDraft"
+            class="flex-1"
+            placeholder="http://127.0.0.1:7890"
+            :disabled="proxySaving"
+            @enter="saveProxyUrl"
+          />
+          <t-button
+            variant="outline"
+            :loading="proxySaving"
+            :disabled="proxyDraft.trim() === proxyUrl"
+            @click="saveProxyUrl"
+          >
+            保存
+          </t-button>
+        </div>
+      </div>
     </div>
   </PageLayout>
 </template>
@@ -65,6 +90,13 @@ onMounted(async () => {
   } catch (err) {
     MessageUtil.error(err instanceof Error ? err.message : '读取开机自启状态失败')
   }
+  try {
+    const config = await window.preload.service.getConfig()
+    proxyUrl.value = config.proxyUrl
+    proxyDraft.value = config.proxyUrl
+  } catch (err) {
+    MessageUtil.error(err instanceof Error ? err.message : '读取代理设置失败')
+  }
 })
 
 async function toggleAutoLaunch(enabled: unknown): Promise<void> {
@@ -79,6 +111,42 @@ async function toggleAutoLaunch(enabled: unknown): Promise<void> {
     MessageUtil.error(err instanceof Error ? err.message : '设置失败')
   } finally {
     autoLaunchLoading.value = false
+  }
+}
+
+/** 代理设置：保存走 service:saveConfig（整对象回传 + 服务重启），空串直连 */
+const proxyUrl = ref('')
+const proxyDraft = ref('')
+const proxySaving = ref(false)
+
+function isValidProxyUrl(raw: string): boolean {
+  if (!raw) return true
+  try {
+    const parsed = new URL(raw)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+async function saveProxyUrl(): Promise<void> {
+  if (proxySaving.value) return
+  const url = proxyDraft.value.trim()
+  if (!isValidProxyUrl(url)) {
+    MessageUtil.error('代理地址必须是合法的 http(s) URL')
+    return
+  }
+  proxySaving.value = true
+  try {
+    const config = await window.preload.service.getConfig()
+    await window.preload.service.saveConfig({ ...config, proxyUrl: url })
+    proxyUrl.value = url
+    proxyDraft.value = url
+    MessageUtil.success('代理设置已保存并生效')
+  } catch (err) {
+    MessageUtil.error(err instanceof Error ? err.message : '保存失败')
+  } finally {
+    proxySaving.value = false
   }
 }
 </script>

@@ -83,7 +83,7 @@ import PageLayout from '@/components/PageLayout/PageLayout.vue'
 import ServiceAccessExamples from './components/ServiceAccessExamples.vue'
 import { MessageUtil } from '@/utils/modal'
 
-const config = ref<ServiceConfig>({ port: 8910, apiKey: '', enabled: false })
+const config = ref<ServiceConfig>({ port: 8910, apiKey: '', enabled: false, proxyUrl: '' })
 const status = ref<ServiceStatus>({ state: 'stopped', port: 0 })
 const portDraft = ref(8910)
 const showKey = ref(false)

@@ -3,9 +3,9 @@ import type { MappingRoute } from '$/db/repo/modelRepo'
 
 /**
  * 转发上游时必须剥离的请求头：
- * - 逐跳 / 传输头：fetch 会自行生成（或不容许出现），转发旧值反而出错（如 content-length 在改写 body 后失配）
+ * - 逐跳 / 传输头：出站客户端会自行生成（或不容许出现），转发旧值反而出错（如 content-length 在改写 body 后失配）
  * - 代理自身鉴权与会话头：authorization / x-api-key 携带的是客户端访问本代理的 Key，转发会把本地 Key 泄漏给上游
- * - accept-encoding 交给 fetch/undici 自行协商压缩
+ * - accept-encoding 交给出站客户端（axios）自行协商压缩
  */
 const EXCLUDED_HEADERS: ReadonlySet<string> = new Set([
   'host',

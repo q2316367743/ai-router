@@ -3,6 +3,8 @@ export interface ServiceConfig {
   port: number
   apiKey: string
   enabled: boolean
+  /** 上游请求代理（http/https URL；空串直连） */
+  proxyUrl: string
 }
 
 /** 服务运行状态 */

@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import type { Readable } from 'node:stream'
+import type { AxiosResponse } from 'axios'
 import { findMapping } from '$/db/repo/modelRepo'
 import { errMsg, sendOpenAiError } from './httpRespond'
 import { buildForwardHeaders, collectExtraHeaders } from './forwardHeaders'
@@ -12,6 +14,7 @@ import {
 } from './proxyLog'
 import { forwardConverted } from './protocol/convertHandler'
 import { joinChatCompletionsUrl, upstreamPathOf } from './protocol/upstreamUrl'
+import { getUpstreamClient, responseHeadersOf } from './upstreamHttp'
 
 interface PassResult {
   usage: TokenUsage | null
@@ -157,12 +160,13 @@ export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Pr
     requestHeaders: forwardHeadersJson
   })
 
-  let upstream: Response
+  // validateStatus 全放行：非 2xx 也由下方透传给客户端（错误正文同样入库）
+  let upstream: AxiosResponse<Readable>
   try {
-    upstream = await fetch(upstreamUrl, {
-      method: 'POST',
+    upstream = await getUpstreamClient().post<Readable>(upstreamUrl, forwardBody, {
       headers: forwardHeaders,
-      body: forwardBody,
+      responseType: 'stream',
+      validateStatus: () => true,
       signal: controller.signal
     })
   } catch (err) {
@@ -189,6 +193,7 @@ export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Pr
       })
       return
     }
+    // 网络层错误 message 已被 upstreamHttp 拦截器增强（错误码 + 底层原因 + 中文提示）
     const resBody = sendOpenAiError(res, 502, `Upstream request failed: ${errMsg(err)}`)
     recordRequest({
       path: logPath,
@@ -211,11 +216,12 @@ export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Pr
     return
   }
 
-  const isStream = (upstream.headers.get('content-type') ?? '').includes('text/event-stream')
-  const resHeaders = serializeResponseHeaders(upstream.headers)
+  const upstreamHeaders = responseHeadersOf(upstream)
+  const resHeaders = serializeResponseHeaders(upstreamHeaders)
+  const isStream = (upstreamHeaders.get('content-type') ?? '').includes('text/event-stream')
   const pass = isStream
-    ? await pipeStreamResponse(upstream, res)
-    : await bufferResponse(upstream, res)
+    ? await pipeStreamResponse(upstream.data, upstream.status, res, controller.signal)
+    : await bufferResponse(upstream, upstreamHeaders, res)
 
   recordRequest({
     path: logPath,
@@ -238,67 +244,87 @@ export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Pr
 }
 
 /** 非流式：读完上游 body 一次性返回 */
-async function bufferResponse(upstream: Response, res: ServerResponse): Promise<PassResult> {
-  const buf = Buffer.from(await upstream.arrayBuffer())
+async function bufferResponse(
+  upstream: AxiosResponse<Readable>,
+  upstreamHeaders: Headers,
+  res: ServerResponse
+): Promise<PassResult> {
+  const buf = await streamToBuffer(upstream.data)
   const body = buf.toString('utf-8')
   if (!res.writableEnded && !res.destroyed) {
     res.writeHead(upstream.status, {
-      'content-type': upstream.headers.get('content-type') ?? 'application/json'
+      'content-type': upstreamHeaders.get('content-type') ?? 'application/json'
     })
     res.end(buf)
   }
   return {
     usage: extractJsonUsage(body),
-    errorSnippet: upstream.ok ? null : body.slice(0, 500),
+    errorSnippet: upstream.status >= 200 && upstream.status < 300 ? null : body.slice(0, 500),
     resBody: body
   }
 }
 
 /** 流式：逐块回写（带背压），边透传边累积完整 SSE 文本并提取 usage */
-async function pipeStreamResponse(upstream: Response, res: ServerResponse): Promise<PassResult> {
+async function pipeStreamResponse(
+  upstream: Readable,
+  status: number,
+  res: ServerResponse,
+  signal: AbortSignal
+): Promise<PassResult> {
   if (!res.writableEnded && !res.destroyed) {
-    res.writeHead(upstream.status, {
+    res.writeHead(status, {
       'content-type': 'text/event-stream',
       'cache-control': 'no-cache',
       connection: 'keep-alive'
     })
   }
-  const reader = upstream.body?.getReader()
-  if (!reader) {
-    res.end()
-    return {
-      usage: null,
-      errorSnippet: upstream.ok ? 'empty upstream body' : 'upstream empty body',
-      resBody: null
-    }
+  // 客户端断开（res close → abort）时销毁上游连接，读循环随之终止
+  const onAbort = (): void => {
+    upstream.destroy()
   }
+  signal.addEventListener('abort', onAbort, { once: true })
 
   const decoder = new TextDecoder()
   const feeder = createSseUsageFeeder()
   const chunks: string[] = []
   let headText = ''
   try {
-    for (;;) {
-      const { done, value } = await reader.read()
-      if (done) break
-      if (!res.write(value)) {
+    for await (const chunk of readChunks(upstream)) {
+      if (!res.write(chunk)) {
         await new Promise<void>((resolve) => res.once('drain', resolve))
       }
-      const text = decoder.decode(value, { stream: true })
+      const text = decoder.decode(chunk, { stream: true })
       chunks.push(text)
       if (headText.length < 500) headText += text
       feeder.feed(text)
     }
   } catch {
-    // 客户端断开（res close → abort）或上游异常：终止透传即可
+    // 客户端断开（abort → destroy）或上游异常：终止透传即可
     res.destroy()
+  } finally {
+    signal.removeEventListener('abort', onAbort)
   }
   res.end()
   return {
     usage: feeder.flush(),
-    errorSnippet: upstream.ok ? null : headText.slice(0, 500),
+    errorSnippet: status >= 200 && status < 300 ? null : headText.slice(0, 500),
     resBody: chunks.join('')
   }
+}
+
+/** 消费上游流为 Buffer（data/error 事件驱动，避免 async iterator 的隐式 any） */
+function streamToBuffer(stream: Readable): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = []
+    stream.on('data', (chunk: Buffer) => chunks.push(chunk))
+    stream.on('end', () => resolve(Buffer.concat(chunks)))
+    stream.on('error', reject)
+  })
+}
+
+/** Readable 的 async iterator 声明为 any，收窄为 Buffer 后再参与后续处理 */
+async function* readChunks(stream: Readable): AsyncGenerator<Buffer> {
+  for await (const chunk of stream) yield chunk as Buffer
 }
 
 /** SSE usage 提取器：按完整行解析 data: 行，取最后一个非空 usage */
