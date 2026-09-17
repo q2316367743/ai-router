@@ -18,12 +18,7 @@
     </div>
 
     <div class="panel-body">
-      <UsageDashboard
-        :stats="stats"
-        :ranges="['last24h', 'last7d', 'last30d']"
-        :show-filters="false"
-        compact
-      />
+      <UsageDashboard :stats="stats" :show-filters="false" compact />
     </div>
   </div>
 </template>
@@ -32,7 +27,7 @@
 /**
  * 托盘统计面板：窄面板（400px）内的用量看板。
  *
- * - 维度只提供 近24小时 / 近七天 / 近30天（「今天」在托盘上与 24 小时高度重合，故不提供）。
+ * - 维度走 UsageDashboard 的默认候选（近24小时 / 近七天 / 近30天）：「今天」与 24 小时高度重合，全站不提供。
  * - 供应商趋势图在 24 小时维度下按供应商分线（对应「24 小时 token 趋势，分为每个供应商的」）。
  * - 面板自身不显示筛选（窄面板放不下），筛选入口在主窗口首页。
  * - 服务状态只以胶囊形式放在标题栏（复用 useServiceStatus 与首页同源），不显示端点。

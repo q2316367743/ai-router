@@ -126,7 +126,7 @@ export interface UseUsageStatsResult {
   refresh(): Promise<void>
 }
 
-export function useUsageStats(initialRange: UsageRangeKey = 'today'): UseUsageStatsResult {
+export function useUsageStats(initialRange: UsageRangeKey = 'last24h'): UseUsageStatsResult {
   const range = ref<UsageRangeKey>(initialRange)
   const providerName = ref('')
   const publicModel = ref('')

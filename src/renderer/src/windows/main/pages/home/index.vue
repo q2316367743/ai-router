@@ -46,14 +46,14 @@ import { useServiceStatus } from '@/hooks/useServiceStatus'
 const router = useRouter()
 
 const status = useServiceStatus()
-const stats = useUsageStats('today')
+const stats = useUsageStats('last24h')
 
 const rowSuccessText = computed(() =>
   stats.successRate.value === null ? '—' : `${stats.successRate.value.toFixed(1)}%`
 )
 
 // 状态行两个数字与统计卡同一口径（色相承载好坏 / 明度承载大小），类名定义在全局 customer.less。
-// 注意这里统计的是「今天」，与下方看板的默认维度一致，故两处档位必然同色。
+// 注意这里统计的是「近 24 小时」，与下方看板的默认维度一致，故两处档位必然同色。
 const successLevelClass = computed(() => {
   const severity = successSeverity(stats.successRate.value)
   return severity ? `stat-${severity}` : ''
