@@ -1,6 +1,12 @@
 import { ipcMain } from 'electron'
 import type { ModelMappingInput } from '@common/types'
-import { createModelMapping, listModelMappings, removeModelMapping, updateModelMapping } from '../db/repo/modelRepo'
+import {
+  archiveModelMapping,
+  createModelMapping,
+  listModelMappings,
+  restoreModelMapping,
+  updateModelMapping
+} from '../db/repo/modelRepo'
 
 /** 模型映射域 IPC：只做参数校验与转发，数据操作在 modelRepo */
 export function registerModelIpc(): void {
@@ -17,9 +23,15 @@ export function registerModelIpc(): void {
     updateModelMapping(input)
   })
 
-  ipcMain.handle('model:remove', (_e, id: string) => {
+  // 归档（假删除）/ 恢复：入参只有 id，状态翻转不经过 update 的编辑入参
+  ipcMain.handle('model:archive', (_e, id: string) => {
     if (!id) throw new Error('缺少 id')
-    removeModelMapping(id)
+    archiveModelMapping(id)
+  })
+
+  ipcMain.handle('model:restore', (_e, id: string) => {
+    if (!id) throw new Error('缺少 id')
+    restoreModelMapping(id)
   })
 }
 

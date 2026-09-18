@@ -1,6 +1,12 @@
 import { ipcMain } from 'electron'
 import type { ProviderInput, ProviderProtocol } from '@common/types'
-import { createProvider, listProviders, removeProvider, updateProvider } from '../db/repo/providerRepo'
+import {
+  archiveProvider,
+  createProvider,
+  listProviders,
+  restoreProvider,
+  updateProvider
+} from '../db/repo/providerRepo'
 
 const PROTOCOLS: readonly ProviderProtocol[] = ['openai', 'openai-responses', 'anthropic']
 
@@ -19,9 +25,15 @@ export function registerProviderIpc(): void {
     updateProvider(input)
   })
 
-  ipcMain.handle('provider:remove', (_e, id: string) => {
+  // 归档（假删除）/ 恢复：入参只有 id，状态翻转不经过 update 的编辑入参
+  ipcMain.handle('provider:archive', (_e, id: string) => {
     if (!id) throw new Error('缺少 id')
-    removeProvider(id)
+    archiveProvider(id)
+  })
+
+  ipcMain.handle('provider:restore', (_e, id: string) => {
+    if (!id) throw new Error('缺少 id')
+    restoreProvider(id)
   })
 }
 

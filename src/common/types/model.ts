@@ -6,6 +6,10 @@ export interface ModelMappingInfo {
   publicName: string
   upstreamName: string
   enabled: boolean
+  /** 归档时间（epoch ms）：非空 = 已归档；归档保留对外名所有权，新建同名会被拒 */
+  archivedAt: number | null
+  /** 所属提供商归档时间：非空说明提供商已归档（其下映射必然连带归档），需先恢复提供商 */
+  providerArchivedAt: number | null
   createdAt: number
 }
 

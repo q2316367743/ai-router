@@ -14,6 +14,8 @@ export function listModelMappings(): ModelMappingInfo[] {
       publicName: models.publicName,
       upstreamName: models.upstreamName,
       enabled: models.enabled,
+      archivedAt: models.archivedAt,
+      providerArchivedAt: providers.archivedAt,
       createdAt: models.createdAt
     })
     .from(models)
@@ -29,12 +31,16 @@ export interface MappingRoute {
   publicName: string
   upstreamName: string
   mappingEnabled: boolean
+  /** 映射归档时间：非空 = 已归档 */
+  mappingArchivedAt: number | null
   providerId: string
   providerName: string
   providerProtocol: ProviderProtocol
   providerBaseUrl: string
   providerApiKey: string
   providerEnabled: boolean
+  /** 提供商归档时间：非空 = 提供商已归档，其下映射连带不可用（先恢复提供商） */
+  providerArchivedAt: number | null
 }
 
 export function findMapping(publicName: string): MappingRoute | null {
@@ -44,12 +50,14 @@ export function findMapping(publicName: string): MappingRoute | null {
       publicName: models.publicName,
       upstreamName: models.upstreamName,
       mappingEnabled: models.enabled,
+      mappingArchivedAt: models.archivedAt,
       providerId: providers.id,
       providerName: providers.name,
       providerProtocol: providers.protocol,
       providerBaseUrl: providers.baseUrl,
       providerApiKey: providers.apiKey,
-      providerEnabled: providers.enabled
+      providerEnabled: providers.enabled,
+      providerArchivedAt: providers.archivedAt
     })
     .from(models)
     .innerJoin(providers, eq(models.providerId, providers.id))
@@ -87,12 +95,14 @@ export function updateModelMapping(input: ModelMappingInput): void {
   const id = input.id ?? ''
   db().transaction((tx) => {
     const previous = tx
-      .select({ publicName: models.publicName })
+      .select({ publicName: models.publicName, archivedAt: models.archivedAt })
       .from(models)
       .where(eq(models.id, id))
       .get()
     // 与改造前一致：id 不存在时静默不改
     if (!previous) return
+    // 归档即冻结：恢复走 restoreModelMapping，编辑与启停入口在 UI 上也不可见
+    if (previous.archivedAt !== null) throw new Error('已归档的模型映射不可编辑，请先恢复')
 
     tx.update(models)
       .set({
@@ -110,17 +120,29 @@ export function updateModelMapping(input: ModelMappingInput): void {
   })
 }
 
-export function removeModelMapping(id: string): void {
-  db().delete(models).where(eq(models.id, id)).run()
+/** 归档模型映射（假删除）：对外名所有权保留（新建同名会被 ensurePublicNameAvailable 拒绝），/v1/models 与路由随即不可见 */
+export function archiveModelMapping(id: string): void {
+  db().update(models).set({ archivedAt: Date.now() }).where(eq(models.id, id)).run()
+}
+
+/**
+ * 恢复模型映射：只翻自身的归档位。所属提供商若仍归档，该映射依旧不可用
+ * （/v1/models 与请求路由另按 providerArchivedAt 拦截），需先恢复提供商。
+ */
+export function restoreModelMapping(id: string): void {
+  db().update(models).set({ archivedAt: null }).where(eq(models.id, id)).run()
 }
 
 function ensurePublicNameAvailable(publicName: string, excludeId?: string): void {
   const row = db()
-    .select({ id: models.id })
+    .select({ id: models.id, archivedAt: models.archivedAt })
     .from(models)
     .where(eq(models.publicName, publicName))
     .get()
   if (row && row.id !== excludeId) {
+    if (row.archivedAt !== null) {
+      throw new Error(`对外模型名「${publicName}」已被归档的映射占用，请先在已归档列表中恢复或改名`)
+    }
     throw new Error(`对外模型名「${publicName}」已存在`)
   }
 }

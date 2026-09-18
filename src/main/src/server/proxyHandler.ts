@@ -84,12 +84,18 @@ export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Pr
   }
 
   const route = findMapping(publicModel)
-  if (!route || !route.mappingEnabled || !route.providerEnabled) {
+  // 已归档（映射自身或所属提供商）与「不存在 / 已禁用」区分报错：归档是对客户端的正式下线
+  // 宣告，明确告知；禁用仍沿用不区分口径的 404，不泄漏配置
+  const archived =
+    route !== null && (route.mappingArchivedAt !== null || route.providerArchivedAt !== null)
+  if (!route || archived || !route.mappingEnabled || !route.providerEnabled) {
     const resBody = sendOpenAiError(
       res,
       404,
-      `The model '${publicModel}' does not exist`,
-      'model_not_found'
+      archived
+        ? `The model '${publicModel}' has been archived`
+        : `The model '${publicModel}' does not exist`,
+      archived ? 'model_archived' : 'model_not_found'
     )
     recordRequest({
       path,
@@ -103,7 +109,7 @@ export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Pr
       status: 404,
       stream: false,
       usage: null,
-      error: 'model not found or disabled',
+      error: archived ? 'model archived' : 'model not found or disabled',
       reqBody: null,
       reqHeaders: null,
       resBody,

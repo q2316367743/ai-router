@@ -40,13 +40,19 @@ declare global {
         list(): Promise<ProviderInfo[]>
         create(input: ProviderInput): Promise<string>
         update(input: ProviderInput): Promise<void>
-        remove(id: string): Promise<void>
+        /** 归档（假删除）：连带归档其下未归档的模型映射 */
+        archive(id: string): Promise<void>
+        /** 恢复：只恢复提供商自身，其下映射需在模型页逐个恢复 */
+        restore(id: string): Promise<void>
       }
       model: {
         list(): Promise<ModelMappingInfo[]>
         create(input: ModelMappingInput): Promise<string>
         update(input: ModelMappingInput): Promise<void>
-        remove(id: string): Promise<void>
+        /** 归档（假删除）：对外名所有权保留，对外列表与请求路由随即不可见 */
+        archive(id: string): Promise<void>
+        /** 恢复：所属提供商仍归档时该映射依旧不可用，需先恢复提供商 */
+        restore(id: string): Promise<void>
       }
       service: {
         getConfig(): Promise<ServiceConfig>

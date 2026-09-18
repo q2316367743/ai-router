@@ -48,9 +48,10 @@ const form = reactive({
   enabled: props.mapping?.enabled ?? true
 })
 
+/** 已归档提供商不可作为归宿；已禁用的剔除但保留当前项（否则编辑既有映射会看不到原提供商） */
 const providerOptions = computed(() =>
   providers.value
-    .filter((p) => p.enabled || p.id === form.providerId)
+    .filter((p) => p.archivedAt === null && (p.enabled || p.id === form.providerId))
     .map((p) => ({ label: p.name, value: p.id }))
 )
 

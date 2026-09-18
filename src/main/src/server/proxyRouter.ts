@@ -85,10 +85,10 @@ export function createProxyApp(): Express {
   return app
 }
 
-/** GET /v1/models：返回对外模型列表（仅启用映射） */
+/** GET /v1/models：返回对外模型列表（启用且未归档，且所属提供商未归档） */
 function handleListModels(_req: Request, res: Response): void {
   const data = listModelMappings()
-    .filter((m) => m.enabled)
+    .filter((m) => m.enabled && m.archivedAt === null && m.providerArchivedAt === null)
     .map((m) => ({
       id: m.publicName,
       object: 'model',

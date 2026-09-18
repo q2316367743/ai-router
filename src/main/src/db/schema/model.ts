@@ -12,6 +12,11 @@ export const models = sqliteTable(
     publicName: text('public_name').notNull().unique(),
     upstreamName: text('upstream_name').notNull(),
     enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+    /**
+     * 归档时间（epoch ms）：非空 = 已归档，与 providers.archivedAt 同义。
+     * 提供商归档会级联归档其下映射；恢复提供商不自动恢复映射，需在模型页逐个恢复。
+     */
+    archivedAt: integer('archived_at'),
     createdAt: integer('created_at').notNull()
   },
   (t) => [index('idx_models_provider').on(t.providerId)]

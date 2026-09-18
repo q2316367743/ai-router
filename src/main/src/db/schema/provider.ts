@@ -14,6 +14,11 @@ export const providers = sqliteTable(
     baseUrl: text('base_url').notNull(),
     apiKey: text('api_key').notNull(),
     enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+    /**
+     * 归档时间（epoch ms）：非空 = 已归档 —— 对外不可见（/v1/models 移除、请求报 model_archived）。
+     * 与 enabled 正交：归档不改 enabled，恢复后原启用状态回来。
+     */
+    archivedAt: integer('archived_at'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull()
   },

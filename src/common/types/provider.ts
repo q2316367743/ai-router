@@ -9,8 +9,11 @@ export interface ProviderInfo {
   baseUrl: string
   apiKey: string
   enabled: boolean
+  /** 归档时间（epoch ms）：非空 = 已归档（对外不可见、请求报 model_archived）；与 enabled 正交 */
+  archivedAt: number | null
   createdAt: number
   updatedAt: number
+  /** 可用模型映射数（不含已归档映射） */
   modelCount: number
 }
 
