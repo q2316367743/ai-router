@@ -117,7 +117,7 @@ import { useChartPalette } from '@/components/EChart/tokens'
 const props = withDefaults(
   defineProps<{
     stats: UseUsageStatsResult
-    /** 统计维度候选（两端一致：近24小时 / 近七天 / 近30天，「今天」无 UI 入口） */
+    /** 统计维度候选（两端一致：今天 / 近24小时 / 近七天 / 近30天） */
     ranges?: UsageRangeKey[]
     /** 是否展示供应商 / 模型筛选 */
     showFilters?: boolean
@@ -127,7 +127,7 @@ const props = withDefaults(
     compact?: boolean
   }>(),
   {
-    ranges: () => ['last24h', 'last7d', 'last30d'],
+    ranges: () => ['today', 'last24h', 'last7d', 'last30d'],
     showFilters: true,
     showSpeed: false,
     compact: false
