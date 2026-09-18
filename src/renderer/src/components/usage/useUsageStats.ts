@@ -48,8 +48,8 @@ export function successSeverity(rate: number | null): StatSeverity | null {
  */
 export function latencySeverity(ms: number | null): StatSeverity | null {
   if (ms === null) return null
-  if (ms < 2_000) return 'good'
-  if (ms < 5_000) return 'fair'
+  if (ms < 5_000) return 'good'
+  if (ms < 10_000) return 'fair'
   return 'poor'
 }
 
@@ -127,7 +127,7 @@ export interface UseUsageStatsResult {
 }
 
 export function useUsageStats(initialRange: UsageRangeKey = 'last24h'): UseUsageStatsResult {
-  const range = ref<UsageRangeKey>(initialRange)
+  const range = useLocalStorage<UsageRangeKey>('range', initialRange)
   const providerName = ref('')
   const publicModel = ref('')
   const loading = ref(false)
