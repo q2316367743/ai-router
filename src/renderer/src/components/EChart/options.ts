@@ -291,8 +291,8 @@ export function buildModelSpeedOption(
   }
 }
 
-/** 供应商 token 数横向条形图（Top 维度，超出部分归入「其他」由调用方处理） */
-export function buildProviderBarOption(
+/** Top 维度横向条形图（供应商 Tokens / 来源 Agent 请求数共用；超出部分归入「其他」由调用方处理） */
+export function buildTopBarOption(
   palette: ChartPalette,
   names: string[],
   values: number[]

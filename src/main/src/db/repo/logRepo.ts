@@ -25,6 +25,7 @@ export type RequestLogStart = Pick<
   | 'upstreamModel'
   | 'providerId'
   | 'modelId'
+  | 'client'
   | 'path'
   | 'stream'
 > &
@@ -59,6 +60,7 @@ const listColumns = {
   publicModel: requestLogs.publicModel,
   providerName: requestLogs.providerName,
   upstreamModel: requestLogs.upstreamModel,
+  client: requestLogs.client,
   path: requestLogs.path,
   status: requestLogs.status,
   durationMs: requestLogs.durationMs,
@@ -94,6 +96,7 @@ export function startLog(entry: RequestLogStart): void {
         upstreamModel: entry.upstreamModel,
         providerId: entry.providerId,
         modelId: entry.modelId,
+        client: entry.client,
         path: entry.path,
         stream: entry.stream,
         requestHeaders: entry.requestHeaders ?? null,
@@ -152,7 +155,7 @@ export function markPendingInterrupted(): void {
     .run()
 }
 
-/** 组合列表筛选条件（成功 = 2xx，失败 = 非 2xx 且已结束；provider/model 精确匹配） */
+/** 组合列表筛选条件（成功 = 2xx，失败 = 非 2xx 且已结束；provider/model/client 精确匹配） */
 function listWhere(query: LogListQuery) {
   return and(
     query.status === 'success' ? between(requestLogs.status, 200, 299) : undefined,
@@ -160,7 +163,8 @@ function listWhere(query: LogListQuery) {
       ? and(isNotNull(requestLogs.status), or(lt(requestLogs.status, 200), gt(requestLogs.status, 299)))
       : undefined,
     query.provider ? eq(requestLogs.providerName, query.provider) : undefined,
-    query.model ? eq(requestLogs.publicModel, query.model) : undefined
+    query.model ? eq(requestLogs.publicModel, query.model) : undefined,
+    query.client ? eq(requestLogs.client, query.client) : undefined
   )
 }
 
@@ -183,7 +187,7 @@ export function listLogs(query: LogListQuery): LogListResult {
   return { items, total: Number(row?.count ?? 0) }
 }
 
-/** 列表筛选项：现有日志中去重后的供应商与请求模型（字典序） */
+/** 列表筛选项：现有日志中去重后的供应商 / 请求模型 / 来源客户端（字典序） */
 export function listFilterOptions(): LogFilterOptions {
   const providers = db()
     .selectDistinct({ value: requestLogs.providerName })
@@ -197,7 +201,15 @@ export function listFilterOptions(): LogFilterOptions {
     .all()
     .map((r) => r.value)
     .sort()
-  return { providers, models }
+  // 来源列可空（未携带 UA / 上线前历史行），筛选项只收有值的
+  const clients = db()
+    .selectDistinct({ value: requestLogs.client })
+    .from(requestLogs)
+    .all()
+    .map((r) => r.value)
+    .filter((value): value is string => value !== null)
+    .sort()
+  return { providers, models, clients }
 }
 
 /** 按 ID 查询单条日志全量详情（含正文与标头） */

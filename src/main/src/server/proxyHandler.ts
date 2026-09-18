@@ -6,6 +6,7 @@ import { findMapping } from '$/db/repo/modelRepo'
 import { errMsg, sendOpenAiError } from './httpRespond'
 import { buildForwardHeaders, collectExtraHeaders } from './forwardHeaders'
 import {
+  parseClientName,
   recordRequest,
   serializeOutboundHeaders,
   serializeResponseHeaders,
@@ -32,6 +33,8 @@ export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Pr
   const requestId = randomUUID()
   const startedAt = Date.now()
   const path = req.url ?? '/'
+  // 来源客户端在入口解析一次：本地拦截与转发各分支共用，且早于任何早返回
+  const client = parseClientName(req.headers['user-agent'])
 
   // express.json 已完成解析与 32MB 上限校验，此处只挡非对象 body（数组/标量）
   const parsed: unknown = req.body
@@ -45,6 +48,7 @@ export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Pr
       upstreamModel: '-',
       providerId: null,
       modelId: null,
+      client,
       startedAt,
       status: 400,
       stream: false,
@@ -69,6 +73,7 @@ export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Pr
       upstreamModel: '-',
       providerId: null,
       modelId: null,
+      client,
       startedAt,
       status: 400,
       stream: false,
@@ -105,6 +110,7 @@ export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Pr
       upstreamModel: route?.upstreamName ?? '-',
       providerId: route?.providerId ?? null,
       modelId: route?.modelId ?? null,
+      client,
       startedAt,
       status: 404,
       stream: false,
@@ -126,6 +132,7 @@ export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Pr
       route,
       publicModel,
       requestId,
+      client,
       startedAt,
       extraHeaders: collectExtraHeaders(req)
     })
@@ -160,6 +167,7 @@ export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Pr
     upstreamModel: route.upstreamName,
     providerId: route.providerId,
     modelId: route.modelId,
+    client,
     path: logPath,
     stream: clientStream,
     requestBody: forwardBody,
@@ -187,6 +195,7 @@ export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Pr
         upstreamModel: route.upstreamName,
         providerId: route.providerId,
         modelId: route.modelId,
+        client,
         startedAt,
         status: 499,
         stream: clientStream,
@@ -207,10 +216,11 @@ export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Pr
       publicModel,
       providerName: route.providerName,
       upstreamModel: route.upstreamName,
-      providerId: route.providerId,
-      modelId: route.modelId,
-      startedAt,
-      status: 502,
+        providerId: route.providerId,
+        modelId: route.modelId,
+        client,
+        startedAt,
+        status: 502,
       stream: clientStream,
       usage: null,
       error: errMsg(err),
@@ -237,6 +247,7 @@ export async function forwardRequest(req: ProxyRequest, res: ServerResponse): Pr
     upstreamModel: route.upstreamName,
     providerId: route.providerId,
     modelId: route.modelId,
+    client,
     startedAt,
     status: upstream.status,
     stream: isStream,

@@ -41,6 +41,14 @@
           size="small"
           style="width: 180px"
         />
+        <t-select
+          v-model="client"
+          :options="clientOptions"
+          placeholder="全部来源"
+          clearable
+          size="small"
+          style="width: 180px"
+        />
       </div>
 
       <t-table
@@ -73,6 +81,10 @@
         <template #streamCell="{ row }">
           <t-tag v-if="row.stream" variant="outline" size="small">流式</t-tag>
           <span v-else class="text-13px text-td-placeholder">非流式</span>
+        </template>
+        <template #client="{ row }">
+          <span v-if="row.client" class="text-13px">{{ row.client }}</span>
+          <span v-else class="text-13px text-td-placeholder">未知</span>
         </template>
         <template #model="{ row }">
           <div class="font-500">{{ row.publicModel }}</div>
@@ -134,15 +146,18 @@ const autoRefresh = ref(true)
 const status = ref<LogStatusFilter>('all')
 const provider = ref<string>('')
 const model = ref<string>('')
+const client = ref<string>('')
 const page = ref(1)
 const expandedKeys = ref<Array<string | number>>([])
 const providerOptions = ref<SelectOption[]>([])
 const modelOptions = ref<SelectOption[]>([])
+const clientOptions = ref<SelectOption[]>([])
 
 const columns = [
   { colKey: 'time', title: '时间', width: 130 },
   { colKey: 'status', title: '状态', width: 90 },
   { colKey: 'streamCell', title: '流式', width: 80 },
+  { colKey: 'client', title: '来源', width: 140 },
   { colKey: 'model', title: '模型', minWidth: 210 },
   { colKey: 'tokens', title: 'Token', width: 180 },
   { colKey: 'duration', title: '持续时间', width: 100 }
@@ -154,6 +169,7 @@ const { list, total, loading, now, refresh } = useLogRefresh({
     status: status.value,
     provider: provider.value || null,
     model: model.value || null,
+    client: client.value || null,
     page: page.value,
     pageSize: PAGE_SIZE
   }),
@@ -181,6 +197,7 @@ async function loadOptions(): Promise<void> {
   const options = await window.preload.log.filterOptions()
   providerOptions.value = options.providers.map((p) => ({ label: p, value: p }))
   modelOptions.value = options.models.map((m) => ({ label: m, value: m }))
+  clientOptions.value = options.clients.map((c) => ({ label: c, value: c }))
 }
 
 function onStatusChange(value: string | number | boolean): void {
@@ -206,12 +223,16 @@ async function clearAll(): Promise<void> {
   await refresh()
 }
 
-// 供应商 / 模型筛选变化：回到第 1 页重新查询
+// 供应商 / 模型 / 来源筛选变化：回到第 1 页重新查询
 watch(provider, () => {
   page.value = 1
   void refresh()
 })
 watch(model, () => {
+  page.value = 1
+  void refresh()
+})
+watch(client, () => {
   page.value = 1
   void refresh()
 })

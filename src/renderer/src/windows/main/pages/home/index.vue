@@ -18,7 +18,7 @@
         >
       </ServiceStatusBar>
 
-      <UsageDashboard :stats="stats" show-speed />
+      <UsageDashboard :stats="stats" show-speed show-clients />
     </div>
   </PageLayout>
 </template>

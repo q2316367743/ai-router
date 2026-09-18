@@ -54,6 +54,7 @@ function normalizeQuery(query: LogListQuery): LogListQuery {
     status,
     provider: typeof query?.provider === 'string' && query.provider ? query.provider : null,
     model: typeof query?.model === 'string' && query.model ? query.model : null,
+    client: typeof query?.client === 'string' && query.client ? query.client : null,
     page: Number.isFinite(query?.page) && query.page > 0 ? Math.floor(query.page) : 1,
     pageSize:
       Number.isFinite(query?.pageSize) && query.pageSize > 0 ? Math.min(100, Math.floor(query.pageSize)) : 25

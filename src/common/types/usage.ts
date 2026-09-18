@@ -79,6 +79,24 @@ export interface UsageModelSpeed {
   lines: UsageSpeedLine[]
 }
 
+/** 来源客户端统计项 */
+export interface UsageClientItem {
+  /** 来源客户端标识：user-agent 首个 token 的名称部分；未携带 UA 的请求归为「未知」 */
+  name: string
+  /** 窗口内请求数（含失败请求，与「请求数」总计同口径） */
+  requestCount: number
+}
+
+/** 来源客户端柱状图数据：固定近七天窗口，数据源为 request_logs（非聚合表，见 docs/app/04-统计看板.md） */
+export interface UsageClientStats {
+  /** 窗口起始日（含），YYYY-MM-DD */
+  startDate: string
+  /** 窗口结束日（含），YYYY-MM-DD */
+  endDate: string
+  /** 按请求数降序 */
+  items: UsageClientItem[]
+}
+
 /** 活跃度单日格子 */
 export interface UsageActivityCell {
   /** YYYY-MM-DD */

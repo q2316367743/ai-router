@@ -3,7 +3,7 @@ import express, { type Express, type NextFunction, type Request, type Response }
 import { listModelMappings } from '$/db/repo/modelRepo'
 import { getServiceConfig } from '$/db/repo/settingRepo'
 import { errMsg, sendJson, sendOpenAiError } from './httpRespond'
-import { recordRequest } from './proxyLog'
+import { parseClientName, recordRequest } from './proxyLog'
 import { forwardRequest } from './proxyHandler'
 
 /** 请求体上限：32MB，防异常大包拖垮内存 */
@@ -49,6 +49,7 @@ export function createProxyApp(): Express {
       upstreamModel: '-',
       providerId: null,
       modelId: null,
+      client: parseClientName(req.headers['user-agent']),
       startedAt,
       status: 401,
       stream: false,

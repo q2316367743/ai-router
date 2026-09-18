@@ -81,6 +81,9 @@
           :height="providerHeight"
         />
 
+        <!-- 来源 Agent 请求数（固定近七天窗口，独立于上方的维度切换与筛选） -->
+        <UsageClientCard v-if="showClients" />
+
         <!-- 模型速度折线（固定近七天窗口，独立于上方的维度切换与筛选） -->
         <UsageSpeedCard v-if="showSpeed" />
       </div>
@@ -105,12 +108,13 @@ import UsageChartCard from './UsageChartCard.vue'
 import UsageActivityCard from './UsageActivityCard.vue'
 import UsageCompositionCard from './UsageCompositionCard.vue'
 import UsageRatioCard from './UsageRatioCard.vue'
+import UsageClientCard from './UsageClientCard.vue'
 import UsageSpeedCard from './UsageSpeedCard.vue'
 import { useUsageCards } from './useUsageCards'
 import {
-  buildProviderBarOption,
   buildProviderTrendOption,
-  buildRequestTokenOption
+  buildRequestTokenOption,
+  buildTopBarOption
 } from '@/components/EChart/options'
 import { useChartPalette } from '@/components/EChart/tokens'
 
@@ -123,6 +127,8 @@ const props = withDefaults(
     showFilters?: boolean
     /** 是否展示模型速度折线（固定近七天，仅主窗口首页开启） */
     showSpeed?: boolean
+    /** 是否展示来源 Agent 请求数条形图（固定近七天，仅主窗口首页开启） */
+    showClients?: boolean
     /** 紧凑模式（托盘窄面板）：图表压矮、统计卡两列、维度切换等宽铺满 */
     compact?: boolean
   }>(),
@@ -130,6 +136,7 @@ const props = withDefaults(
     ranges: () => ['today', 'last24h', 'last7d', 'last30d'],
     showFilters: true,
     showSpeed: false,
+    showClients: false,
     compact: false
   }
 )
@@ -205,7 +212,7 @@ const providerOption = computed(() => {
     names.push('其他')
     values.push(rest.reduce((acc, item) => acc + item.totalTokens, 0))
   }
-  return buildProviderBarOption(palette.value, names, values)
+    return buildTopBarOption(palette.value, names, values)
 })
 
 const providerHeight = computed(() =>

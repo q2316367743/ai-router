@@ -42,6 +42,8 @@ export interface ForwardConvertedOptions {
   route: MappingRoute
   publicModel: string
   requestId: string
+  /** 来源客户端标识（入口已由 `parseClientName` 解析，转换路径不重复解析 UA） */
+  client: string | null
   startedAt: number
   extraHeaders: Record<string, string>
 }
@@ -52,7 +54,7 @@ export interface ForwardConvertedOptions {
  * 日志为线上口径：经 wireCapture 记录实际发给提供商的请求与提供商返回的原始响应。
  */
 export async function forwardConverted(options: ForwardConvertedOptions): Promise<void> {
-  const { body, res, route, publicModel, requestId, startedAt, extraHeaders } = options
+  const { body, res, route, publicModel, requestId, client, startedAt, extraHeaders } = options
   // 日志 path 记上游实际请求路径（而非客户端入口路径）
   const logPath = upstreamPathOf(joinConvertUrl(route.providerBaseUrl, route.providerProtocol))
   // 转发前先落 pending 日志（日志页即时可见「进行中」）；stream 由原始 body 判定，
@@ -66,6 +68,7 @@ export async function forwardConverted(options: ForwardConvertedOptions): Promis
     upstreamModel: route.upstreamName,
     providerId: route.providerId,
     modelId: route.modelId,
+    client,
     path: logPath,
     stream: isRecord(body) && body['stream'] === true
   })
@@ -79,6 +82,7 @@ export async function forwardConverted(options: ForwardConvertedOptions): Promis
       upstreamModel: route.upstreamName,
       providerId: route.providerId,
       modelId: route.modelId,
+      client,
       startedAt,
       status: outcome.status,
       stream: outcome.stream,

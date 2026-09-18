@@ -48,6 +48,7 @@ declare module 'vue' {
     TTooltip: typeof import('tdesign-vue-next')['Tooltip']
     UsageActivityCard: typeof import('./src/components/usage/UsageActivityCard.vue')['default']
     UsageChartCard: typeof import('./src/components/usage/UsageChartCard.vue')['default']
+    UsageClientCard: typeof import('./src/components/usage/UsageClientCard.vue')['default']
     UsageCompositionCard: typeof import('./src/components/usage/UsageCompositionCard.vue')['default']
     UsageDashboard: typeof import('./src/components/usage/UsageDashboard.vue')['default']
     UsageHeatmap: typeof import('./src/components/usage/UsageHeatmap.vue')['default']

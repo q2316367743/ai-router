@@ -19,6 +19,8 @@ export interface ProxyLogEntry extends HistoryRef {
   publicModel: string
   providerName: string
   upstreamModel: string
+  /** 来源客户端标识（`parseClientName(req.headers['user-agent'])` 的返回值；未携带 UA 时为 null） */
+  client: string | null
   startedAt: number
   status: number
   stream: boolean
@@ -81,6 +83,7 @@ export function recordRequest(entry: ProxyLogEntry): void {
       upstreamModel: entry.upstreamModel,
       providerId: entry.providerId,
       modelId: entry.modelId,
+      client: entry.client,
       startedAt: entry.startedAt,
       finishedAt,
       status: entry.status,
@@ -152,6 +155,23 @@ function stringifyHeaders(
     else if (Array.isArray(value)) out[name] = value.join(', ')
   }
   return Object.keys(out).length > 0 ? JSON.stringify(out) : null
+}
+
+/** 来源客户端标识长度上限：UA 首个 token 可能是异常长串，入库前截断 */
+const CLIENT_NAME_MAX = 64
+
+/**
+ * 请求头 user-agent → 来源客户端标识：取首个空白分隔 token，再取第一个 `/` 之前的部分。
+ *
+ * 只留名称不留版本（版本随客户端升级变化，带上会让同一来源裂成多组）；
+ * 已知样例 kimi-code-desktop/1.0.1、ZCode/3.12.3 ai-sdk/…、opencode/1.18.31 ai-sdk/… 分别得到
+ * kimi-code-desktop、ZCode、opencode。无 UA 或取不到名称时返回 null（不写哨兵值，
+ * 与 finished_at 留 null 表示进行中同义）。
+ */
+export function parseClientName(userAgent: string | undefined): string | null {
+  const first = userAgent?.trim().split(/\s+/)[0] ?? ''
+  const name = first.split('/')[0].trim().slice(0, CLIENT_NAME_MAX)
+  return name || null
 }
 
 /** 兜底估算：提供商未返回用量时按请求正文估算（CJK 字符 1 字 1 token，其余 4 字符 1 token） */

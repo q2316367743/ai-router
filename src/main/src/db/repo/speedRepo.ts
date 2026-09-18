@@ -6,7 +6,7 @@ import { dayLabel } from '$/utils/date'
 import { resolveRange } from './usageRepo'
 
 /**
- * 模型速度仓储：唯一直接实时聚合 request_logs 的统计项（不读用量聚合表）。
+ * 模型速度仓储：与 `clientRepo.ts` 同属「直接实时聚合 request_logs」的统计项（不读用量聚合表）。
  *
  * 之所以独立成文件而不并入 usageRepo：本域读的是日志表而非聚合表，口径与实现都自成一套；
  * 且拆开后两个文件都在 RL-05 的 500 行约束内。

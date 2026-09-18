@@ -26,6 +26,12 @@ export const requestLogs = sqliteTable(
      */
     providerId: text('provider_id'),
     modelId: text('model_id'),
+    /**
+     * 来源客户端标识（请求头 user-agent 首个 token 的 `/` 前部分，如 kimi-code-desktop / ZCode / opencode）：
+     * 只存名称不存版本，归一化规则见 `server/proxyLog.ts` 的 parseClientName。
+     * 可空：请求未携带 UA，以及本列上线之前写入的历史行。
+     */
+    client: text('client'),
     path: text('path').notNull(),
     /** 响应状态码；本地拦截时为 400/401/404/502 等；null 表示请求进行中 */
     status: integer('status'),

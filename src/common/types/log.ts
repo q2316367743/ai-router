@@ -9,6 +9,11 @@ export interface RequestLogItem {
   publicModel: string
   providerName: string
   upstreamModel: string
+  /**
+   * 来源客户端标识（请求头 user-agent 首个 token 的名称部分，如 kimi-code-desktop / ZCode / opencode）；
+   * null = 未携带 UA 或本字段上线前的历史行
+   */
+  client: string | null
   path: string
   /** 响应状态码；本地拦截时为 400/401/404/502 等；null 表示请求进行中 */
   status: number | null
@@ -51,11 +56,12 @@ export interface TodayStats {
 /** 列表状态筛选口径：成功 = 2xx，失败 = 非 2xx 且已结束；进行中（status 为 null）只在 all 下出现 */
 export type LogStatusFilter = 'all' | 'success' | 'fail'
 
-/** 日志列表查询参数（跨保留窗口按时间倒序分页；provider/model 为 null 表示不筛选） */
+/** 日志列表查询参数（跨保留窗口按时间倒序分页；provider/model/client 为 null 表示不筛选） */
 export interface LogListQuery {
   status: LogStatusFilter
   provider: string | null
   model: string | null
+  client: string | null
   page: number
   pageSize: number
 }
@@ -66,8 +72,9 @@ export interface LogListResult {
   total: number
 }
 
-/** 列表筛选项（现有日志中去重后的供应商 / 请求模型） */
+/** 列表筛选项（现有日志中去重后的供应商 / 请求模型 / 来源客户端） */
 export interface LogFilterOptions {
   providers: string[]
   models: string[]
+  clients: string[]
 }

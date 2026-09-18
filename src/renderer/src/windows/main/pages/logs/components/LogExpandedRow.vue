@@ -26,7 +26,8 @@
           <t-descriptions-item label="请求 ID" :span="2">
             <span class="mono text-12px">{{ log.requestId }}</span>
           </t-descriptions-item>
-          <t-descriptions-item label="客户端">{{ log.publicModel }}</t-descriptions-item>
+          <t-descriptions-item label="请求模型">{{ log.publicModel }}</t-descriptions-item>
+          <t-descriptions-item label="来源">{{ log.client ?? '未知' }}</t-descriptions-item>
           <t-descriptions-item label="供应商">{{ log.providerName }}</t-descriptions-item>
           <t-descriptions-item label="实际模型">{{ log.upstreamModel }}</t-descriptions-item>
           <t-descriptions-item label="输入 Tokens">{{
@@ -44,7 +45,7 @@
           <t-descriptions-item label="缓存写入">{{
             formatTokens(log.cacheWriteTokens)
           }}</t-descriptions-item>
-          <t-descriptions-item label="总计 Tokens">{{
+          <t-descriptions-item label="总计 Tokens" :span="3">{{
             formatTokens(log.totalTokens)
           }}</t-descriptions-item>
         </t-descriptions>

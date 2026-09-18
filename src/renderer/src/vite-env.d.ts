@@ -13,6 +13,7 @@ import type {
   ServiceConfig,
   ServiceStatus,
   TodayStats,
+  UsageClientStats,
   UsageDailyItem,
   UsageFilterOptions,
   UsageModelSpeed,
@@ -85,6 +86,8 @@ declare global {
         listByRange(startDate: string, endDate: string): Promise<UsageDailyItem[]>
         /** 模型速度折线：固定近七天窗口，按供应商 × 模型分线（数据源为请求日志） */
         modelSpeed(): Promise<UsageModelSpeed>
+        /** 来源客户端请求数：固定近七天窗口，按来源分组计数（数据源为请求日志） */
+        clientStats(): Promise<UsageClientStats>
       }
       tray: {
         /** 收起托盘统计面板 */

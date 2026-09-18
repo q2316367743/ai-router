@@ -1,5 +1,6 @@
 import { ipcRenderer } from 'electron'
 import type {
+  UsageClientStats,
   UsageDailyItem,
   UsageFilterOptions,
   UsageModelSpeed,
@@ -23,5 +24,9 @@ export const usageApi = {
   /** 模型速度折线：固定近七天窗口，按供应商 × 模型分线（数据源为请求日志） */
   modelSpeed(): Promise<UsageModelSpeed> {
     return ipcRenderer.invoke('usage:modelSpeed')
+  },
+  /** 来源客户端请求数：固定近七天窗口，按来源分组计数（数据源为请求日志） */
+  clientStats(): Promise<UsageClientStats> {
+    return ipcRenderer.invoke('usage:clientStats')
   }
 }
