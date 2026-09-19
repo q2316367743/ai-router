@@ -47,7 +47,7 @@ export function buildForwardHeaders(
   }
 }
 
-/** 转换路径附加头：content-type / accept 与认证头由 ai-sdk 按上游协议自建，其余客户端头经 headers 选项附带 */
+/** 转换路径附加头：content-type / accept 与认证头由转换策略按上游协议自建，其余客户端头原样附带 */
 export function collectExtraHeaders(req: IncomingMessage): Record<string, string> {
   const headers = pickForwardableHeaders(req)
   delete headers['content-type']

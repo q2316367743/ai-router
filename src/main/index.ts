@@ -7,7 +7,7 @@ import { initDb } from '$/db/client'
 import { cleanupLogsOnStartup } from '$/ipc/logIpc'
 import { registerIpc } from '$/registerIpc'
 import { ensureServiceDefaults } from '$/db/repo/settingRepo'
-import { startProxyServer, stopProxyServer } from '$/server/proxyServer'
+import { startProxyServer, stopProxyServer } from '$/server'
 
 // 单实例锁：二次拉起直接退出
 const hasSingleInstanceLock = app.requestSingleInstanceLock()

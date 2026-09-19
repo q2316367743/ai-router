@@ -3,7 +3,7 @@ import { accumulateUsage } from '$/db/repo/usageRepo'
 import type { HistoryRef } from '$/db/repo/renameRepo'
 import { refreshTrayUsage } from '$/app/tray'
 
-/** token 用量（透传路径从响应提取，转换路径来自 ai-sdk 统一 usage；均为提供商上报值） */
+/** token 用量（透传路径从响应提取，转换路径由协议解码归一；均为提供商上报值） */
 export interface TokenUsage {
   promptTokens: number
   completionTokens: number

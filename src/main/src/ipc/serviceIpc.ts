@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron'
 import type { ServiceConfig } from '@common/types'
-import { getServiceConfig, regenerateApiKey, saveServiceConfig } from '../db/repo/settingRepo'
-import { getServerStatus, restartProxyServer } from '../server/proxyServer'
+import { getServiceConfig, regenerateApiKey, saveServiceConfig } from '$/db/repo/settingRepo'
+import { getServerStatus, restartProxyServer } from '$/server'
 
 /** 服务配置域 IPC：保存后自动重启代理服务；Key 每请求实时读取，变更无需重启 */
 export function registerServiceIpc(): void {

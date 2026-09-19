@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
+import { LRUCache } from 'lru-cache'
 import type { ModelMappingInfo, ModelMappingInput, ProviderProtocol } from '@common/types'
 import { db } from '../client'
 import { models, providers } from '../schema'
@@ -24,7 +25,14 @@ export function listModelMappings(): ModelMappingInfo[] {
     .all()
 }
 
-/** 代理转发路由：按对外模型名一次联表取齐映射与提供商信息 */
+/**
+ * 代理转发路由：按对外模型名一次联表取齐映射与提供商信息。
+ *
+ * 路由缓存：代理热路径每请求都查（agent 高频调用），读多写少，惰性填充（lru-cache，
+ * max 1000 只作防膨胀保险）、任一模型/提供商写操作后整体失效（`invalidateMappingCache`，
+ * 同 settingRepo 写时失效口径）。只缓存命中行（未映射名不占缓存）；返回的是缓存对象，
+ * 调用方不得修改。
+ */
 export interface MappingRoute {
   /** 映射 ID：随日志与用量一并落库，供改名时定位历史行（见 renameRepo） */
   modelId: string
@@ -43,7 +51,16 @@ export interface MappingRoute {
   providerArchivedAt: number | null
 }
 
+const routeCache = new LRUCache<string, MappingRoute>({ max: 1000 })
+
+/** 路由缓存整体失效：MappingRoute 是 models × providers 联表结果，两侧任一写操作都影响 */
+export function invalidateMappingCache(): void {
+  routeCache.clear()
+}
+
 export function findMapping(publicName: string): MappingRoute | null {
+  const cached = routeCache.get(publicName)
+  if (cached) return cached
   const row = db()
     .select({
       modelId: models.id,
@@ -63,7 +80,9 @@ export function findMapping(publicName: string): MappingRoute | null {
     .innerJoin(providers, eq(models.providerId, providers.id))
     .where(eq(models.publicName, publicName))
     .get()
-  return row ?? null
+  if (!row) return null
+  routeCache.set(publicName, row)
+  return row
 }
 
 export function createModelMapping(input: ModelMappingInput): string {
@@ -80,6 +99,7 @@ export function createModelMapping(input: ModelMappingInput): string {
       createdAt: Date.now()
     })
     .run()
+  invalidateMappingCache()
   return id
 }
 
@@ -118,11 +138,13 @@ export function updateModelMapping(input: ModelMappingInput): void {
       applyModelRename(tx, id, previous.publicName, input.publicName)
     }
   })
+  invalidateMappingCache()
 }
 
 /** 归档模型映射（假删除）：对外名所有权保留（新建同名会被 ensurePublicNameAvailable 拒绝），/v1/models 与路由随即不可见 */
 export function archiveModelMapping(id: string): void {
   db().update(models).set({ archivedAt: Date.now() }).where(eq(models.id, id)).run()
+  invalidateMappingCache()
 }
 
 /**
@@ -131,6 +153,7 @@ export function archiveModelMapping(id: string): void {
  */
 export function restoreModelMapping(id: string): void {
   db().update(models).set({ archivedAt: null }).where(eq(models.id, id)).run()
+  invalidateMappingCache()
 }
 
 function ensurePublicNameAvailable(publicName: string, excludeId?: string): void {

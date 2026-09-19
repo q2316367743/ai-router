@@ -22,7 +22,7 @@ export interface RequestLogItem {
   stream: boolean
   promptTokens: number
   completionTokens: number
-  /** 思考 token（提供商上报或 ai-sdk 详情字段） */
+  /** 思考 token（提供商上报明细） */
   reasoningTokens: number
   /** 缓存读取 / 写入 token */
   cacheReadTokens: number

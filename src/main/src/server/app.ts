@@ -1,13 +1,17 @@
 import { randomUUID } from 'node:crypto'
 import express, { type Express, type NextFunction, type Request, type Response } from 'express'
-import { listModelMappings } from '$/db/repo/modelRepo'
 import { getServiceConfig } from '$/db/repo/settingRepo'
-import { errMsg, sendJson, sendOpenAiError } from './httpRespond'
-import { parseClientName, recordRequest } from './proxyLog'
-import { forwardRequest } from './proxyHandler'
+import { errMsg, sendOpenAiError } from './respond'
+import { parseClientName, recordRequest } from './logging/requestLog'
+import { handleListModels } from './routes/listModels'
+import { handleChatCompletions } from './routes/chatCompletions'
+import { handleMessages } from './routes/messages'
+import { handleResponses } from './routes/responses'
 
 /** 请求体上限：32MB，防异常大包拖垮内存 */
 const MAX_BODY_BYTES = '32mb'
+
+const parseJsonBody = express.json({ limit: MAX_BODY_BYTES })
 
 /** 组装代理服务应用：CORS → 鉴权 → 路由 → 404 / 错误兜底 */
 export function createProxyApp(): Express {
@@ -64,10 +68,17 @@ export function createProxyApp(): Express {
 
   app.get('/v1/models', handleListModels)
 
-  // 对外仅暴露 OpenAI Chat Completions：express.json 负责 body 解析与 32MB 上限
-  // （超限/非法 JSON 由错误兜底中间件转换）；异协议上游在 forwardRequest 内走转换路径
-  app.post('/v1/chat/completions', express.json({ limit: MAX_BODY_BYTES }), (req, res, next) => {
-    forwardRequest(req, res).catch(next)
+  // 对外暴露三个协议入口（OpenAI Chat / Anthropic Messages / OpenAI Responses）：
+  // express.json 负责 body 解析与 32MB 上限（超限/非法 JSON 由错误兜底中间件转换）；
+  // 入口协议 × 上游协议的组合在转发层消化，同协议走 raw 透传
+  app.post('/v1/chat/completions', parseJsonBody, (req, res, next) => {
+    handleChatCompletions(req, res).catch(next)
+  })
+  app.post('/v1/messages', parseJsonBody, (req, res, next) => {
+    handleMessages(req, res).catch(next)
+  })
+  app.post('/v1/responses', parseJsonBody, (req, res, next) => {
+    handleResponses(req, res).catch(next)
   })
 
   app.use((req, res) => {
@@ -75,6 +86,8 @@ export function createProxyApp(): Express {
   })
 
   // 兜底错误处理：任何分支都不允许向客户端抛异常
+  // （四参签名是 Express 识别错误中间件的依据，_next 不可省略）
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     const status = pickErrorStatus(err)
     if (status === 413) sendOpenAiError(res, 413, 'Request body too large')
@@ -85,23 +98,11 @@ export function createProxyApp(): Express {
   return app
 }
 
-/** GET /v1/models：返回对外模型列表（启用且未归档，且所属提供商未归档） */
-function handleListModels(_req: Request, res: Response): void {
-  const data = listModelMappings()
-    .filter((m) => m.enabled && m.archivedAt === null && m.providerArchivedAt === null)
-    .map((m) => ({
-      id: m.publicName,
-      object: 'model',
-      created: Math.floor(m.createdAt / 1000),
-      owned_by: m.providerName
-    }))
-  sendJson(res, 200, { object: 'list', data })
-}
-
 function isAuthorized(req: Request, apiKey: string): boolean {
   if (!apiKey) return false
   const auth = req.headers.authorization
-  if (typeof auth === 'string' && auth.startsWith('Bearer ') && auth.slice(7) === apiKey) return true
+  if (typeof auth === 'string' && auth.startsWith('Bearer ') && auth.slice(7) === apiKey)
+    return true
   const xKey = req.headers['x-api-key']
   return typeof xKey === 'string' && xKey === apiKey
 }

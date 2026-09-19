@@ -2,7 +2,7 @@ import type { Server } from 'node:http'
 import { BrowserWindow } from 'electron'
 import type { ServiceStatus } from '@common/types'
 import { getServiceConfig } from '$/db/repo/settingRepo'
-import { createProxyApp } from './proxyRouter'
+import { createProxyApp } from './app'
 
 let httpServer: Server | null = null
 let status: ServiceStatus = { state: 'stopped', port: 0 }

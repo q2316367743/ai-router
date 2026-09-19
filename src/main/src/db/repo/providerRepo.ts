@@ -3,6 +3,7 @@ import { nanoid } from 'nanoid'
 import type { ProviderInfo, ProviderInput } from '@common/types'
 import { db } from '../client'
 import { models, providers } from '../schema'
+import { invalidateMappingCache } from './modelRepo'
 import { applyProviderRename } from './renameRepo'
 
 export function listProviders(): ProviderInfo[] {
@@ -41,6 +42,7 @@ export function createProvider(input: ProviderInput): string {
       updatedAt: now
     })
     .run()
+  invalidateMappingCache()
   return id
 }
 
@@ -80,6 +82,7 @@ export function updateProvider(input: ProviderInput): void {
       applyProviderRename(tx, id, previous.name, input.name)
     }
   })
+  invalidateMappingCache()
 }
 
 /**
@@ -100,6 +103,7 @@ export function archiveProvider(id: string): void {
       .where(and(eq(models.providerId, id), isNull(models.archivedAt)))
       .run()
   })
+  invalidateMappingCache()
 }
 
 /**
@@ -114,4 +118,5 @@ export function restoreProvider(id: string): void {
     .set({ archivedAt: null, updatedAt: Date.now() })
     .where(eq(providers.id, id))
     .run()
+  invalidateMappingCache()
 }

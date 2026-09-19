@@ -1,9 +1,7 @@
-import { Readable } from 'node:stream'
 import axios, {
   AxiosError,
   type AxiosInstance,
   type AxiosRequestConfig,
-  type AxiosResponse,
   type AxiosResponseHeaders,
   type RawAxiosResponseHeaders
 } from 'axios'
@@ -72,50 +70,16 @@ export function getUpstreamClient(): AxiosInstance {
   return client
 }
 
-/** HeadersInit → 普通记录（供出站捕获与 axios headers 透传） */
-export function headersToRecord(init: HeadersInit | undefined): Record<string, string> {
-  if (!init) return {}
-  return Object.fromEntries(new Headers(init).entries())
-}
-
 /** axios 响应头 → WHATWG Headers（多值 append 保留），供日志序列化与 content-type 判定 */
-export function responseHeadersOf(res: AxiosResponse): Headers {
+export function responseHeadersOf(res: {
+  headers: AxiosResponseHeaders | RawAxiosResponseHeaders
+}): Headers {
   const headers = new Headers()
-  const raw: AxiosResponseHeaders | RawAxiosResponseHeaders = res.headers
+  const raw = res.headers
   for (const [key, value] of Object.entries(raw)) {
     if (value == null || typeof value === 'boolean') continue
     if (Array.isArray(value)) for (const item of value) headers.append(key, item)
     else headers.set(key, value)
   }
   return headers
-}
-
-/**
- * fetch 兼容出站（注入 ai-sdk provider 的 fetch 选项）：axios 承载真实请求。
- * validateStatus 全放行保持 fetch「非 2xx 不 reject」语义（SDK 自行读 body 报错）；
- * body 以流透传，abort 时销毁上游连接。
- */
-export const axiosFetch: typeof fetch = async (input, init) => {
-  const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
-  const response = await getUpstreamClient().request<Readable>({
-    url,
-    method: init?.method ?? 'GET',
-    data: init?.body ?? null,
-    headers: headersToRecord(init?.headers),
-    responseType: 'stream',
-    validateStatus: () => true,
-    signal: init?.signal ?? undefined
-  })
-  const stream = response.data
-  const signal = init?.signal
-  if (signal) {
-    if (signal.aborted) stream.destroy()
-    else signal.addEventListener('abort', () => stream.destroy(), { once: true })
-  }
-  const body = Readable.toWeb(stream) as unknown as BodyInit
-  return new Response(body, {
-    status: response.status,
-    statusText: response.statusText,
-    headers: responseHeadersOf(response)
-  })
 }

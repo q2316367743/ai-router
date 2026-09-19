@@ -1,17 +1,21 @@
-import { jsonSchema, tool } from 'ai'
-import type { ModelMessage, Tool } from 'ai'
 import {
   ChatParseError,
   isRecord,
-  type ChatPrompt,
-  type ChatToolChoice,
-  type ReasoningEffort
-} from './types'
+  type Conversation,
+  type ConversationMessage,
+  type ReasoningEffort,
+  type ToolChoice,
+  type ToolSpec,
+  type TextPart,
+  type ImagePart,
+  type ToolCallPart,
+  type UserContent
+} from '../conversation'
 
 const EFFORTS: readonly ReasoningEffort[] = ['minimal', 'low', 'medium', 'high']
 
-/** 把 OpenAI Chat 请求体解析为 ai-sdk 提示与参数；不合规结构抛 ChatParseError（→ 400） */
-export function parseChatPrompt(body: unknown): ChatPrompt {
+/** 入口解析：OpenAI Chat 请求体 → 统一会话；不合规结构抛 ChatParseError（→ 400） */
+export function parseOpenAiChatRequest(body: unknown): Conversation {
   if (!isRecord(body)) throw new ChatParseError('Request body is not valid JSON')
   if (typeof body['model'] !== 'string' || !body['model']) {
     throw new ChatParseError("'model' is required")
@@ -24,7 +28,7 @@ export function parseChatPrompt(body: unknown): ChatPrompt {
     throw new ChatParseError('Only n=1 is supported')
   }
 
-  const messages: ModelMessage[] = []
+  const messages: ConversationMessage[] = []
   const systems: string[] = []
   // tool_call_id → 工具名：补全 role:'tool' 消息必需的 toolName
   const toolNames = new Map<string, string>()
@@ -38,9 +42,8 @@ export function parseChatPrompt(body: unknown): ChatPrompt {
   const tools = toTools(body['tools'])
   return {
     stream: body['stream'] === true,
-    messages: systems.length
-      ? [{ role: 'system', content: systems.join('\n\n') }, ...messages]
-      : messages,
+    system: systems.length ? systems.join('\n\n') : undefined,
+    messages,
     tools,
     toolChoice: toToolChoice(body['tool_choice'], tools),
     temperature: optionalNumber(body['temperature']),
@@ -56,7 +59,7 @@ function convertMessage(
   raw: unknown,
   toolNames: Map<string, string>,
   systems: string[],
-  messages: ModelMessage[]
+  messages: ConversationMessage[]
 ): void {
   if (!isRecord(raw)) throw new ChatParseError('messages items must be objects')
   const role = raw['role']
@@ -83,69 +86,61 @@ function convertMessage(
 function convertAssistant(
   raw: Record<string, unknown>,
   toolNames: Map<string, string>,
-  messages: ModelMessage[]
+  messages: ConversationMessage[]
 ): void {
   const text = flattenText(raw['content'])
-  const parts: Array<
-    | { type: 'text'; text: string }
-    | { type: 'tool-call'; toolCallId: string; toolName: string; input: unknown }
-  > = []
-  if (text) parts.push({ type: 'text', text })
-
+  const toolCalls: ToolCallPart[] = []
   const calls = Array.isArray(raw['tool_calls']) ? raw['tool_calls'] : []
   for (const item of calls) {
     const call = parseToolCall(item)
     toolNames.set(call.id, call.name)
-    parts.push({ type: 'tool-call', toolCallId: call.id, toolName: call.name, input: call.input })
+    toolCalls.push({ type: 'tool-call', toolCallId: call.id, toolName: call.name, args: call.args })
   }
-  if (!parts.length) throw new ChatParseError('assistant message needs content or tool_calls')
-  messages.push({ role: 'assistant', content: parts })
+  if (!text && !toolCalls.length) {
+    throw new ChatParseError('assistant message needs content or tool_calls')
+  }
+  messages.push({ role: 'assistant', content: text, toolCalls })
 }
 
-function parseToolCall(raw: unknown): { id: string; name: string; input: unknown } {
+function parseToolCall(raw: unknown): { id: string; name: string; args: unknown } {
   if (!isRecord(raw)) throw new ChatParseError('tool_calls items must be objects')
   const id = typeof raw['id'] === 'string' ? raw['id'] : ''
   const fn = isRecord(raw['function']) ? raw['function'] : null
   const name = fn && typeof fn['name'] === 'string' ? fn['name'] : ''
   if (!id || !name) throw new ChatParseError('tool_call needs id and function.name')
   const args = fn && typeof fn['arguments'] === 'string' ? fn['arguments'] : ''
-  let input: unknown = {}
+  let parsed: unknown = {}
   try {
-    input = args ? JSON.parse(args) : {}
+    parsed = args ? JSON.parse(args) : {}
   } catch {
     throw new ChatParseError(`tool_call '${name}' arguments is not valid JSON`)
   }
-  return { id, name, input }
+  return { id, name, args: parsed }
 }
 
 function convertToolResult(
   raw: Record<string, unknown>,
   toolNames: Map<string, string>,
-  messages: ModelMessage[]
+  messages: ConversationMessage[]
 ): void {
   const id = typeof raw['tool_call_id'] === 'string' ? raw['tool_call_id'] : ''
   if (!id) throw new ChatParseError('tool message needs tool_call_id')
   messages.push({
-    role: 'tool',
-    content: [
-      {
-        type: 'tool-result',
-        toolCallId: id,
-        toolName: toolNames.get(id) ?? 'unknown',
-        output: { type: 'text', value: flattenText(raw['content']) }
-      }
-    ]
+    role: 'tool_result',
+    toolCallId: id,
+    toolName: toolNames.get(id) ?? 'unknown',
+    output: flattenText(raw['content'])
   })
 }
 
-function convertUserContent(
-  content: unknown
-): string | Array<{ type: 'text'; text: string } | { type: 'image'; image: string }> {
+function convertUserContent(content: unknown): UserContent {
   if (!Array.isArray(content)) return flattenText(content)
-  return content.map((item: unknown) => {
+  const parts: Array<TextPart | ImagePart> = []
+  for (const item of content) {
     if (!isRecord(item)) throw new ChatParseError('content parts must be objects')
     if (item['type'] === 'text' && typeof item['text'] === 'string') {
-      return { type: 'text' as const, text: item['text'] }
+      parts.push({ type: 'text', text: item['text'] })
+      continue
     }
     if (item['type'] === 'image_url') {
       const holder = item['image_url']
@@ -156,10 +151,12 @@ function convertUserContent(
             ? holder['url']
             : ''
       if (!url) throw new ChatParseError('image_url part needs url')
-      return { type: 'image' as const, image: url }
+      parts.push({ type: 'image_url', url })
+      continue
     }
     throw new ChatParseError(`Unsupported content part: ${String(item['type'])}`)
-  })
+  }
+  return parts
 }
 
 /** system/user 消息的 content 兼容字符串与分段数组，统一拍平为纯文本 */
@@ -178,10 +175,10 @@ function flattenText(content: unknown): string {
   return String(content)
 }
 
-function toTools(raw: unknown): Record<string, Tool> | undefined {
+function toTools(raw: unknown): ToolSpec[] | undefined {
   if (raw == null) return undefined
   if (!Array.isArray(raw)) throw new ChatParseError('tools must be an array')
-  const tools: Record<string, Tool> = {}
+  const byName = new Map<string, ToolSpec>()
   for (const item of raw) {
     if (!isRecord(item) || !isRecord(item['function'])) {
       throw new ChatParseError('tools items must be function tools')
@@ -189,22 +186,16 @@ function toTools(raw: unknown): Record<string, Tool> | undefined {
     const fn = item['function']
     const name = typeof fn['name'] === 'string' ? fn['name'] : ''
     if (!name) throw new ChatParseError('tools item needs function.name')
-    tools[name] = tool({
+    byName.set(name, {
+      name,
       description: typeof fn['description'] === 'string' ? fn['description'] : undefined,
-      inputSchema: jsonSchema(
-        (isRecord(fn['parameters'])
-          ? fn['parameters']
-          : { type: 'object', properties: {} }) as Parameters<typeof jsonSchema>[0]
-      )
+      parameters: isRecord(fn['parameters']) ? fn['parameters'] : { type: 'object', properties: {} }
     })
   }
-  return Object.keys(tools).length ? tools : undefined
+  return byName.size ? [...byName.values()] : undefined
 }
 
-function toToolChoice(
-  raw: unknown,
-  tools: Record<string, Tool> | undefined
-): ChatToolChoice | undefined {
+function toToolChoice(raw: unknown, tools: ToolSpec[] | undefined): ToolChoice | undefined {
   if (!tools) return undefined
   if (raw == null || raw === 'auto') return 'auto'
   if (raw === 'none' || raw === 'required') return raw
