@@ -1,77 +1,89 @@
 <template>
   <PageLayout title="服务">
     <div class="p-24px">
-      <!-- 服务配置 -->
-      <t-card title="服务配置" header-bordered class="mb-12px">
-        <div class="flex items-center justify-between">
-          <div>
-            <div class="font-500">启用本地服务</div>
-            <div class="text-13px text-td-secondary mt-4px">{{ stateHint }}</div>
+      <!-- 连接：状态 + Base URL + API Key + 端口，接入最常用的信息集中在一张卡 -->
+      <div class="card">
+        <div class="flex items-center justify-between gap-16px">
+          <div class="flex items-center gap-10px min-w-0">
+            <span class="status-dot" :class="`status-dot--${statusMeta.tone}`" />
+            <div class="min-w-0">
+              <div class="font-500">{{ statusMeta.label }}</div>
+              <div class="text-13px text-td-secondary mt-2px truncate">{{ statusMeta.desc }}</div>
+            </div>
           </div>
-          <t-switch :value="config.enabled" :loading="switching" @change="toggleEnabled" />
+          <div class="flex items-center gap-8px shrink-0">
+            <span class="text-13px text-td-secondary">启用服务</span>
+            <t-switch :value="config.enabled" :loading="switching" @change="toggleEnabled" />
+          </div>
         </div>
 
-        <t-divider />
-
-        <div class="font-500 mb-8px">监听端口</div>
-        <div class="flex items-center gap-8px">
-          <t-input-number
-            v-model="portDraft"
-            :min="1"
-            :max="65535"
-            :step="1"
-            style="width: 140px"
-          />
-          <t-button
-            variant="outline"
-            :disabled="portDraft === config.port"
-            :loading="savingPort"
-            @click="savePort"
-          >
-            保存并重启
-          </t-button>
-        </div>
-        <div class="text-13px text-td-placeholder mt-8px">
-          仅监听 127.0.0.1，修改端口后服务自动重启
-        </div>
-      </t-card>
-
-      <!-- 对接信息 -->
-      <t-card title="对接信息" header-bordered class="mb-12px">
-        <div class="font-500 mb-8px">对外 API Key</div>
-        <div class="mb-12px">
-          <code class="text-13px break-all">{{ displayKey }}</code>
-        </div>
-        <div class="flex items-center gap-8px">
-          <t-button variant="outline" size="small" @click="showKey = !showKey">
-            <template #icon><t-icon :name="showKey ? 'browse' : 'browse-off'" /></template>
-            {{ showKey ? '隐藏' : '显示' }}
-          </t-button>
-          <t-button variant="outline" size="small" @click="copyText(config.apiKey)">
-            <template #icon><t-icon name="file-copy" /></template>
-            复制
-          </t-button>
-          <t-popconfirm content="重新生成后旧 Key 立即失效，确定？" @confirm="regenerate">
-            <t-button variant="outline" size="small" theme="danger">重新生成</t-button>
-          </t-popconfirm>
+        <div class="field-row">
+          <div class="field-label">Base URL</div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-8px">
+              <t-input :value="endpoint" readonly class="flex-1 font-mono" />
+              <t-tooltip content="复制 Base URL">
+                <t-button variant="outline" shape="square" @click="onCopy(endpoint)">
+                  <template #icon><t-icon name="file-copy" /></template>
+                </t-button>
+              </t-tooltip>
+            </div>
+            <div class="field-tip">
+              OpenAI 系客户端填此地址；Anthropic 系客户端填不带 /v1 的地址，见下方接入示例
+            </div>
+          </div>
         </div>
 
-        <t-divider />
-
-        <div class="font-500 mb-8px">接入端点</div>
-        <div class="flex items-center gap-4px">
-          <code class="text-13px break-all">{{ endpoint }}</code>
-          <t-button variant="text" shape="square" size="small" @click="copyText(endpoint)">
-            <template #icon><t-icon name="file-copy" /></template>
-          </t-button>
+        <div class="field-row">
+          <div class="field-label">API Key</div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-8px">
+              <t-input :value="displayKey" readonly class="flex-1 font-mono" />
+              <t-tooltip :content="showKey ? '隐藏' : '显示'">
+                <t-button variant="outline" shape="square" @click="showKey = !showKey">
+                  <template #icon><t-icon :name="showKey ? 'browse' : 'browse-off'" /></template>
+                </t-button>
+              </t-tooltip>
+              <t-tooltip content="复制">
+                <t-button variant="outline" shape="square" @click="onCopy(config.apiKey)">
+                  <template #icon><t-icon name="file-copy" /></template>
+                </t-button>
+              </t-tooltip>
+              <t-popconfirm content="重新生成后旧 Key 立即失效，确定？" @confirm="regenerate">
+                <t-button variant="outline" theme="danger">重新生成</t-button>
+              </t-popconfirm>
+            </div>
+            <div class="field-tip">所有协议共用；鉴权同时支持 Authorization: Bearer 与 x-api-key</div>
+          </div>
         </div>
-        <div class="text-13px text-td-placeholder mt-8px">
-          客户端 Base URL 填此项，模型名使用「模型映射」中定义的对外名称
-        </div>
-      </t-card>
 
-      <!-- 接入示例 -->
-      <ServiceAccessExamples :endpoint="endpoint" :api-key="config.apiKey" />
+        <div class="field-row">
+          <div class="field-label">监听端口</div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-8px">
+              <t-input-number
+                v-model="portDraft"
+                :min="1"
+                :max="65535"
+                :step="1"
+                style="width: 140px"
+              />
+              <t-button
+                variant="outline"
+                :disabled="portDraft === config.port"
+                :loading="savingPort"
+                @click="savePort"
+              >
+                保存并重启
+              </t-button>
+            </div>
+            <div class="field-tip">仅监听 127.0.0.1，修改端口后服务自动重启</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 接入示例：按对外协议分栏 -->
+      <ServiceAccessExamples class="mt-12px" :endpoint="endpoint" :api-key="config.apiKey" />
     </div>
   </PageLayout>
 </template>
@@ -79,6 +91,7 @@
 <script lang="ts" setup>
 import type { ServiceConfig, ServiceStatus } from '@common/types'
 import { maskKey } from '@/utils/format'
+import { copyText } from '@/utils/clipboard'
 import PageLayout from '@/components/PageLayout/PageLayout.vue'
 import ServiceAccessExamples from './components/ServiceAccessExamples.vue'
 import { MessageUtil } from '@/utils/modal'
@@ -94,15 +107,30 @@ let unsubscribe: (() => void) | null = null
 
 const endpoint = computed(() => `http://127.0.0.1:${config.value.port}/v1`)
 
-const stateHint = computed(() => {
-  if (status.value.state === 'running') return `运行中 · ${endpoint.value}`
-  if (status.value.state === 'error') return `异常：${status.value.error ?? '未知错误'}`
-  return config.value.enabled ? '已停止' : '关闭后客户端将无法访问'
-})
+/** 状态行四态：运行 / 异常 / 已启用未就绪 / 已关闭；色值取各主题下可读的色阶 */
+const statusMeta = computed<{ tone: 'running' | 'error' | 'wait' | 'off'; label: string; desc: string }>(
+  () => {
+    if (status.value.state === 'running')
+      return {
+        tone: 'running',
+        label: '服务运行中',
+        desc: `127.0.0.1:${status.value.port} 监听中`
+      }
+    if (status.value.state === 'error')
+      return { tone: 'error', label: '服务异常', desc: status.value.error ?? '未知错误' }
+    if (config.value.enabled)
+      return { tone: 'wait', label: '服务已停止', desc: '等待服务启动…' }
+    return { tone: 'off', label: '服务已关闭', desc: '开启后客户端才能接入' }
+  }
+)
 
 const displayKey = computed(() =>
   showKey.value ? config.value.apiKey : maskKey(config.value.apiKey)
 )
+
+function onCopy(text: string): void {
+  void copyText(text)
+}
 
 async function toggleEnabled(enabled: unknown): Promise<void> {
   switching.value = true
@@ -136,19 +164,6 @@ async function savePort(): Promise<void> {
   }
 }
 
-async function copyText(text: string): Promise<void> {
-  if (!text) {
-    MessageUtil.error('暂无可复制内容')
-    return
-  }
-  try {
-    await navigator.clipboard.writeText(text)
-    MessageUtil.success('已复制')
-  } catch {
-    MessageUtil.error('复制失败')
-  }
-}
-
 async function regenerate(): Promise<void> {
   try {
     config.value.apiKey = await window.preload.service.regenerateKey()
@@ -177,3 +192,89 @@ onUnmounted(() => {
   unsubscribe = null
 })
 </script>
+
+<style lang="less" scoped>
+.card {
+  padding: 16px;
+  border-radius: var(--fluent-radius-card);
+  background: var(--td-bg-color-secondarycontainer);
+  border: 1px solid var(--fluent-border-subtle);
+}
+
+/* 行间发丝线分隔，替代 t-divider，保持紧凑的凭据表观感 */
+.field-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--fluent-border-subtle);
+}
+
+.field-label {
+  flex-shrink: 0;
+  width: 76px;
+  font-weight: 500;
+  line-height: 32px;
+}
+
+.field-tip {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--td-text-color-placeholder);
+}
+
+.status-dot {
+  --dot-color: var(--td-text-color-placeholder);
+  position: relative;
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--dot-color);
+
+  &--running {
+    --dot-color: var(--td-success-color-5);
+  }
+  &--error {
+    --dot-color: var(--td-error-color-5);
+  }
+  &--wait {
+    --dot-color: var(--td-warning-color-6);
+  }
+
+  /* 运行中的呼吸光环：Fluent 式轻动效，只动 transform / opacity */
+  &--running::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 1px solid var(--dot-color);
+    animation: service-pulse 2.4s ease-out infinite;
+  }
+}
+
+:root[theme-mode='dark'] {
+  .status-dot--running {
+    --dot-color: var(--td-success-color-8);
+  }
+  .status-dot--error {
+    --dot-color: var(--td-error-color-7);
+  }
+  .status-dot--wait {
+    --dot-color: var(--td-warning-color-8);
+  }
+}
+
+@keyframes service-pulse {
+  0% {
+    transform: scale(0.5);
+    opacity: 0.8;
+  }
+  70%,
+  100% {
+    transform: scale(1.4);
+    opacity: 0;
+  }
+}
+</style>
