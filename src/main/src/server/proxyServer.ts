@@ -52,6 +52,6 @@ export async function restartProxyServer(): Promise<void> {
 function updateStatus(next: ServiceStatus): void {
   status = next
   for (const win of BrowserWindow.getAllWindows()) {
-    win.webContents.send('server:status', next)
+    if (!win.isDestroyed()) win.webContents.send('server:status', next)
   }
 }

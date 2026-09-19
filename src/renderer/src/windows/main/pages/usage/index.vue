@@ -47,6 +47,7 @@
         :loading="loading"
         hover
         :empty="'所选区间内暂无使用记录'"
+        :pagination="pagination"
       >
         <template #totalTokens="{ row }">{{ formatTokens(row.totalTokens) }}</template>
       </t-table>
@@ -90,6 +91,9 @@ const columns = [
   { colKey: 'unrecognizedTokens', title: '无法统计', width: 100 },
   { colKey: 'totalTokens', title: '总 Tokens', width: 110 }
 ]
+
+/** 本地分页：长区间 × 多供应商/模型的聚合行可达上万行，避免整表 DOM 全渲染 */
+const pagination = { defaultCurrent: 1, defaultPageSize: 50, showJumper: true }
 
 const summary = computed(() => {
   return list.value.reduce(

@@ -1,4 +1,4 @@
-import { and, between, eq, gt, inArray, isNotNull, isNull, lt, or, sql } from 'drizzle-orm'
+import { and, between, desc, eq, gt, inArray, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm'
 import type {
   LogFilterOptions,
   LogListQuery,
@@ -18,6 +18,10 @@ const RETENTION_DAYS = 7
 const BODY_SWEEP_BATCH = 200
 /** 正文清扫的批间停顿（ms）：清扫没有时限，要慢慢跑完，不跟代理请求抢主进程 */
 const BODY_SWEEP_PAUSE_MS = 50
+/** 清空日志单批行数：一条无界 DELETE 在大库上会长时间阻塞主进程，与清扫同款分批节奏 */
+const CLEAR_BATCH = 200
+/** 清空日志的批间停顿（ms） */
+const CLEAR_PAUSE_MS = 25
 
 export type RequestLogEntry = Omit<RequestLogDetail, 'id' | 'logDate'> & HistoryRef
 /** pending 行入参：结束阶段才可知的字段全部缺省（由 recordLog 回填） */
@@ -142,7 +146,9 @@ export function cleanupExpiredLogs(): void {
   lastCleanupDate = today
   const boundary = dateKey(Date.now() - (RETENTION_DAYS - 1) * 24 * 60 * 60 * 1000)
   db().delete(requestLogs).where(lt(requestLogs.logDate, boundary)).run()
-  void sweepExpiredBodies()
+  void sweepExpiredBodies().catch((err: unknown) => {
+    console.error('[log] 过期正文清扫失败:', err)
+  })
 }
 
 /**
@@ -281,9 +287,45 @@ export function getLogDetail(id: number): RequestLogDetail | null {
   return db().select().from(requestLogs).where(eq(requestLogs.id, id)).get() ?? null
 }
 
-/** 清空全部日志（保留窗口内） */
-export function clearAllLogs(): void {
-  db().delete(requestLogs).run()
+/**
+ * 清空全部日志（保留窗口内）。
+ *
+ * 按 id 升序分批删除、批间让出事件循环，执行期间代理请求照常响应；以发起时刻的最大 id
+ * 为上界，清空期间新写入的日志不受影响。清空后清扫游标归零，防止从旧游标之后开始漏扫新行。
+ */
+export async function clearAllLogs(): Promise<void> {
+  const latest = db()
+    .select({ id: requestLogs.id })
+    .from(requestLogs)
+    .orderBy(desc(requestLogs.id))
+    .limit(1)
+    .get()
+  const maxId = latest?.id
+  if (maxId == null) return
+  let cursor = 0
+  for (;;) {
+    const rows = db()
+      .select({ id: requestLogs.id })
+      .from(requestLogs)
+      .where(and(gt(requestLogs.id, cursor), lte(requestLogs.id, maxId)))
+      .orderBy(requestLogs.id)
+      .limit(CLEAR_BATCH)
+      .all()
+    const last = rows[rows.length - 1]
+    if (!last) break
+    db()
+      .delete(requestLogs)
+      .where(
+        inArray(
+          requestLogs.id,
+          rows.map((row) => row.id)
+        )
+      )
+      .run()
+    cursor = last.id
+    await pause(CLEAR_PAUSE_MS)
+  }
+  bodySweepCursor = 0
 }
 
 export function getTodayStats(): TodayStats {

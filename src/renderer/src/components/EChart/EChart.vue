@@ -33,7 +33,8 @@ onMounted(() => {
   observer.observe(host.value)
 })
 
-watch(() => props.option, render, { deep: true })
+// option 每次取数后都是 computed 新对象（引用必变），shallow watch 即可触发重绘
+watch(() => props.option, render)
 
 // keep-alive 页面切回来时容器刚重新插入 DOM，补一次测量（ResizeObserver 不保证此时回调）
 onActivated(() => chart?.resize())

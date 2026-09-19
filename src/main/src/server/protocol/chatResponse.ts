@@ -131,10 +131,14 @@ export function createChunkWriter(res: ServerResponse, model: string): ChunkWrit
     await write(`data: ${JSON.stringify(chunk)}\n\n`)
   }
 
-  /** 写出（背压等待 drain） */
+  /** 写出（背压等待 drain）：客户端断开后 drain 永不触发，close 兜底放行 */
   const write = async (line: string): Promise<void> => {
+    if (res.destroyed || res.writableEnded) return
     if (!res.write(line)) {
-      await new Promise<void>((resolve) => res.once('drain', resolve))
+      await new Promise<void>((resolve) => {
+        res.once('drain', resolve)
+        res.once('close', resolve)
+      })
     }
   }
 

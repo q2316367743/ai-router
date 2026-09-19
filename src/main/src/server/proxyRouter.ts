@@ -15,7 +15,6 @@ export function createProxyApp(): Express {
 
   // CORS：预检直接放行（allow-headers 回显客户端申请的自定义头，如 x-session-id）；其余响应统一放行来源
   app.use((req, res, next) => {
-    console.log(req.path)
     if (req.method === 'OPTIONS') {
       const requested = req.headers['access-control-request-headers']
       res.writeHead(204, {

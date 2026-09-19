@@ -174,7 +174,11 @@ export function useUsageStats(initialRange: UsageRangeKey = 'last24h'): UseUsage
     }))
   })
 
+  /** 取数序号：响应返回时序号已过期（期间发起了更新的取数）则丢弃，防旧响应覆盖新维度数据 */
+  let seq = 0
+
   async function refresh(silent = false): Promise<void> {
+    const current = ++seq
     if (!silent) loading.value = true
     try {
       const query: UsageQuery = {
@@ -182,7 +186,8 @@ export function useUsageStats(initialRange: UsageRangeKey = 'last24h'): UseUsage
         providerName: providerName.value || null,
         publicModel: publicModel.value || null
       }
-      overview.value = await window.preload.usage.overview(query)
+      const result = await window.preload.usage.overview(query)
+      if (current === seq) overview.value = result
     } finally {
       if (!silent) loading.value = false
     }

@@ -9,7 +9,7 @@ import {
   listLogs,
   markPendingInterrupted,
   onLogWritten
-} from '../db/repo/logRepo'
+} from '$/db/repo/logRepo'
 
 const STATUS_FILTERS: ReadonlySet<string> = new Set(['all', 'success', 'fail'])
 
@@ -57,6 +57,8 @@ function normalizeQuery(query: LogListQuery): LogListQuery {
     client: typeof query?.client === 'string' && query.client ? query.client : null,
     page: Number.isFinite(query?.page) && query.page > 0 ? Math.floor(query.page) : 1,
     pageSize:
-      Number.isFinite(query?.pageSize) && query.pageSize > 0 ? Math.min(100, Math.floor(query.pageSize)) : 25
+      Number.isFinite(query?.pageSize) && query.pageSize > 0
+        ? Math.min(100, Math.floor(query.pageSize))
+        : 25
   }
 }

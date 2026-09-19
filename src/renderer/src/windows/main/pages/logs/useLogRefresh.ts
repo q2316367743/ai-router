@@ -20,6 +20,7 @@ interface LogRefreshOptions {
 /**
  * 日志列表取数：推送订阅（log:changed）+ 防抖 + 兜底轮询 + 进行中耗时计时。
  *
+ * 兜底轮询静默刷新（不亮 loading）且窗口隐藏时跳过，与推送路径的 hidden 判断对齐；
  * 进行中的请求在列表里需要「实时耗时」，故维护一个 now 时间戳；只在存在进行中行时启动
  * 1s 计时器，无进行中行时完全停掉，空闲态零开销。
  */
@@ -39,14 +40,18 @@ export function useLogRefresh(options: LogRefreshOptions) {
   /** 查询进行中标记：期间到达的刷新请求合并为一次补跑，避免并发覆盖结果 */
   let inFlight = false
   let queued = false
+  /** 补跑是否静默（同一次合并里以最后一角的请求为准） */
+  let queuedSilent = false
 
-  async function refresh(): Promise<void> {
+  async function refresh(opts?: { silent?: boolean }): Promise<void> {
+    const silent = opts?.silent ?? false
     if (inFlight) {
       queued = true
+      queuedSilent = silent
       return
     }
     inFlight = true
-    loading.value = true
+    if (!silent) loading.value = true
     try {
       const result = await window.preload.log.list(options.buildQuery())
       list.value = result.items
@@ -58,7 +63,7 @@ export function useLogRefresh(options: LogRefreshOptions) {
       inFlight = false
       if (queued) {
         queued = false
-        void refresh()
+        void refresh({ silent: queuedSilent })
       }
     }
   }
@@ -92,7 +97,10 @@ export function useLogRefresh(options: LogRefreshOptions) {
     void refresh()
     unsubscribe = window.preload.log.onChanged(onChanged)
     pollTimer = setInterval(() => {
-      if (options.autoRefresh.value) void refresh()
+      // 窗口隐藏到托盘时跳过轮询（推送恢复可见后仍会触发），轮询走静默不闪 loading
+      if (options.autoRefresh.value && document.visibilityState !== 'hidden') {
+        void refresh({ silent: true })
+      }
     }, POLL_INTERVAL_MS)
   })
 

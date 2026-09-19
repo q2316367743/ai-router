@@ -4,7 +4,7 @@
       <t-checkbox :checked="autoRefresh" @change="(v: unknown) => (autoRefresh = v === true)"
         >自动刷新</t-checkbox
       >
-      <t-button variant="outline" size="small" :loading="loading" @click="refresh">
+      <t-button variant="outline" size="small" :loading="loading" @click="() => refresh()">
         <template #icon><t-icon name="refresh" /></template>
         刷新
       </t-button>

@@ -307,8 +307,13 @@ async function pipeStreamResponse(
   let headText = ''
   try {
     for await (const chunk of readChunks(upstream)) {
+      if (res.destroyed) break
       if (!res.write(chunk)) {
-        await new Promise<void>((resolve) => res.once('drain', resolve))
+        // 客户端断开后 drain 永不触发，close 兜底放行（abort 已销毁上游，读循环随之终止）
+        await new Promise<void>((resolve) => {
+          res.once('drain', resolve)
+          res.once('close', resolve)
+        })
       }
       const text = decoder.decode(chunk, { stream: true })
       chunks.push(text)
