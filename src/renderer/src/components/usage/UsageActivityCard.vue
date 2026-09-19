@@ -24,25 +24,26 @@
  */
 import { computed } from 'vue'
 import type { UsageActivity } from '@common/types'
+import type { DashboardCardContext } from './cardTypes'
 import MetricCard from './MetricCard.vue'
 import UsageHeatmap from './UsageHeatmap.vue'
 import { formatTokens } from '@/utils/format'
 
-const props = withDefaults(
-  defineProps<{ activity: UsageActivity; /** 紧凑模式（托盘窄面板）：热力图与指标缩到近 12 周 */ compact?: boolean }>(),
-  { compact: false }
-)
+const props = defineProps<{ ctx: DashboardCardContext }>()
 
 /** 紧凑模式的窗口天数：12 周 × 7 天，约 13 列，400px 面板内格子仍可读 */
 const COMPACT_WINDOW_DAYS = 84
 
+const activity = computed<UsageActivity>(() => props.ctx.stats.overview.value.activity)
+const compact = computed(() => props.ctx.compact)
+
 /** 展示口径：compact 且数据满一年时切片最近 84 天，并重算窗口内指标 */
 const view = computed<UsageActivity>(() => {
-  const activity = props.activity
-  if (!props.compact || activity.cells.length <= COMPACT_WINDOW_DAYS) return activity
-  const cells = activity.cells.slice(-COMPACT_WINDOW_DAYS)
+  const current = activity.value
+  if (!compact.value || current.cells.length <= COMPACT_WINDOW_DAYS) return current
+  const cells = current.cells.slice(-COMPACT_WINDOW_DAYS)
   const first = cells[0]
-  if (!first) return activity
+  if (!first) return current
   let longestStreak = 0
   let currentStreak = 0
   let totalTokens = 0

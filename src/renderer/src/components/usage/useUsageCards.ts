@@ -1,10 +1,9 @@
 /**
  * 看板四张统计卡的展示配置。
  *
- * 把「哪个指标配哪个图标、胶囊怎么写、卡内迷你图画什么」从模板里抽出来，模板只负责遍历渲染。
+ * 把「哪个指标配哪个图标、胶囊怎么写、卡内迷你图画什么」从模板里抽出来。
  * 阈值与档位判定仍全部来自 useUsageStats（本文件不重复定义任何阈值，只做文案与图元选择）。
  */
-import { computed, type ComputedRef } from 'vue'
 import {
   REQUEST_MAGNITUDE_THRESHOLDS,
   TOKEN_MAGNITUDE_THRESHOLDS,
@@ -79,35 +78,36 @@ function decimalsOf(value: number): number {
   return Number.isInteger(value) ? 0 : 1
 }
 
-export function useUsageCards(stats: UseUsageStatsResult): ComputedRef<UsageCardConfig[]> {
-  return computed(() => {
-    const totals = stats.overview.value.totals
-    const series = stats.overview.value.series
-    const rate = stats.successRate.value
-    const latencyMs = stats.averageDurationMs.value
+/** 统计卡的 key（与 cardRegistry 注册 id 尾段对应，由注册表经 extraProps 下发） */
+export type StatCardKey = 'requests' | 'success' | 'latency' | 'tokens'
 
-    const success = successSeverity(rate)
-    const latency = latencySeverity(latencyMs)
-    const requestLevel = magnitudeLevel(totals.requestCount, REQUEST_MAGNITUDE_THRESHOLDS)
-    const tokenLevel = magnitudeLevel(totals.totalTokens, TOKEN_MAGNITUDE_THRESHOLDS)
-    const token = tokenParts(totals.totalTokens)
+/** 按卡构建单张统计卡的展示配置：读取 stats 各 ref 的当前值，由调用方（卡片组件）包 computed 保持响应性 */
+export function buildStatCardConfig(stats: UseUsageStatsResult, key: StatCardKey): UsageCardConfig {
+  const totals = stats.overview.value.totals
+  const series = stats.overview.value.series
 
-    return [
-      {
-        key: 'requests',
+  switch (key) {
+    case 'requests': {
+      const level = magnitudeLevel(totals.requestCount, REQUEST_MAGNITUDE_THRESHOLDS)
+      return {
+        key,
         label: '请求数',
         icon: 'chart-bar',
         value: totals.requestCount,
         unit: '次',
         decimalPlaces: 0,
         hasValue: true,
-        pill: MAGNITUDE_PILL[requestLevel],
-        levelClass: `stat-mag-${requestLevel}`,
+        pill: MAGNITUDE_PILL[level],
+        levelClass: `stat-mag-${level}`,
         viz: { kind: 'bars', values: series.requestCount },
         footer: `成功 ${totals.successCount} · 失败 ${totals.failCount}`
-      },
-      {
-        key: 'success',
+      }
+    }
+    case 'success': {
+      const rate = stats.successRate.value
+      const severity = successSeverity(rate)
+      return {
+        key,
         label: '成功率',
         icon: 'check-circle',
         value: rate ?? 0,
@@ -115,41 +115,49 @@ export function useUsageCards(stats: UseUsageStatsResult): ComputedRef<UsageCard
         decimalPlaces: 1,
         hasValue: rate !== null,
         pill: successPill(rate),
-        levelClass: success ? `stat-${success}` : '',
+        levelClass: severity ? `stat-${severity}` : '',
         // 零请求时不画空进度条：「没有请求」与「成功率 0%」不是一回事
         viz: rate === null ? null : { kind: 'progress', percent: rate },
         footer: `失败 ${totals.failCount} 次`
-      },
-      {
-        key: 'latency',
+      }
+    }
+    case 'latency': {
+      const latencyMs = stats.averageDurationMs.value
+      const severity = latencySeverity(latencyMs)
+      return {
+        key,
         label: '平均延迟',
         icon: 'time',
         value: latencyMs === null ? 0 : latencyMs / 1000,
         unit: 's',
         decimalPlaces: 2,
         hasValue: latencyMs !== null,
-        pill: latency ? LATENCY_PILL[latency] : null,
-        levelClass: latency ? `stat-${latency}` : '',
+        pill: severity ? LATENCY_PILL[severity] : null,
+        levelClass: severity ? `stat-${severity}` : '',
         // 进度条表达「占差档阈值（5s）的比例」：短而绿 = 快，长而红 = 慢
         viz:
           latencyMs === null
             ? null
             : { kind: 'progress', percent: (latencyMs / LATENCY_LIMIT_MS) * 100 },
         footer: `累计耗时 ${(totals.durationMs / 1000).toFixed(1)}s`
-      },
-      {
-        key: 'tokens',
+      }
+    }
+    case 'tokens': {
+      const token = tokenParts(totals.totalTokens)
+      const level = magnitudeLevel(totals.totalTokens, TOKEN_MAGNITUDE_THRESHOLDS)
+      return {
+        key,
         label: '总 Tokens',
         icon: 'layers',
         value: token.value,
         unit: token.unit,
         decimalPlaces: decimalsOf(token.value),
         hasValue: true,
-        pill: MAGNITUDE_PILL[tokenLevel],
-        levelClass: `stat-mag-${tokenLevel}`,
+        pill: MAGNITUDE_PILL[level],
+        levelClass: `stat-mag-${level}`,
         viz: { kind: 'bars', values: series.totalTokens },
         footer: `缓存占比 ${stats.cacheRatio.value.toFixed(1)}%`
       }
-    ]
-  })
+    }
+  }
 }

@@ -68,6 +68,14 @@ declare global {
         /** 订阅服务状态推送（server:status），返回退订函数 */
         onStatusChanged(cb: (status: ServiceStatus) => void): () => void
       }
+      setting: {
+        /** 读取键值设置（值经 JSON 解析；键不存在或脏数据返回 null） */
+        get(key: string): Promise<unknown>
+        /** 写入键值设置（JSON 序列化存 settings 表），并向所有窗口广播 setting:changed */
+        set(key: string, value: unknown): Promise<void>
+        /** 订阅设置变更广播（任意窗口保存触发，携带变更的键名），返回退订函数 */
+        onSettingChanged(cb: (key: string) => void): () => void
+      }
       log: {
         /** 按条件（状态/供应商/模型）分页查询日志列表（轻量字段，不含正文与标头） */
         list(query: LogListQuery): Promise<LogListResult>

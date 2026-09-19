@@ -14,6 +14,15 @@
         </t-radio-group>
       </div>
 
+      <!-- 看板卡片 -->
+      <div class="card mt-12px">
+        <div class="font-500">看板卡片</div>
+        <div class="text-13px text-td-secondary mt-4px mb-12px">
+          首页与托盘面板看板的卡片显示与顺序，改动立即生效并同步到另一窗口
+        </div>
+        <DashboardLayoutEditor />
+      </div>
+
       <!-- 启动 -->
       <div class="card mt-12px">
         <div class="flex items-center justify-between gap-16px">
@@ -61,6 +70,7 @@
 <script lang="ts" setup>
 import { onMounted, ref, computed } from 'vue'
 import PageLayout from '@/components/PageLayout/PageLayout.vue'
+import DashboardLayoutEditor from './components/DashboardLayoutEditor.vue'
 import { useColorMode } from '@/hooks/colorMode'
 import { MessageUtil } from '@/utils/modal'
 

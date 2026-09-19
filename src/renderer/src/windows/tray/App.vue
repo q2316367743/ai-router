@@ -18,7 +18,7 @@
     </div>
 
     <div class="panel-body">
-      <UsageDashboard :stats="stats" :show-filters="false" compact />
+      <UsageDashboard :stats="stats" :show-filters="false" surface="tray" compact />
     </div>
   </div>
 </template>

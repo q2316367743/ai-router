@@ -7,6 +7,7 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    CardLayoutContent: typeof import('./src/components/usage/CardLayoutContent.vue')['default']
     EChart: typeof import('./src/components/EChart/EChart.vue')['default']
     MetricCard: typeof import('./src/components/usage/MetricCard.vue')['default']
     MiniBars: typeof import('./src/components/usage/MiniBars.vue')['default']
@@ -52,13 +53,18 @@ declare module 'vue' {
     TTextarea: typeof import('tdesign-vue-next')['Textarea']
     TTooltip: typeof import('tdesign-vue-next')['Tooltip']
     UsageActivityCard: typeof import('./src/components/usage/UsageActivityCard.vue')['default']
+    UsageCacheRatioCard: typeof import('./src/components/usage/UsageCacheRatioCard.vue')['default']
     UsageChartCard: typeof import('./src/components/usage/UsageChartCard.vue')['default']
     UsageClientCard: typeof import('./src/components/usage/UsageClientCard.vue')['default']
     UsageCompositionCard: typeof import('./src/components/usage/UsageCompositionCard.vue')['default']
     UsageDashboard: typeof import('./src/components/usage/UsageDashboard.vue')['default']
     UsageHeatmap: typeof import('./src/components/usage/UsageHeatmap.vue')['default']
+    UsageProviderBarCard: typeof import('./src/components/usage/UsageProviderBarCard.vue')['default']
+    UsageProviderTrendCard: typeof import('./src/components/usage/UsageProviderTrendCard.vue')['default']
     UsageRatioCard: typeof import('./src/components/usage/UsageRatioCard.vue')['default']
     UsageSpeedCard: typeof import('./src/components/usage/UsageSpeedCard.vue')['default']
     UsageStatCard: typeof import('./src/components/usage/UsageStatCard.vue')['default']
+    UsageSuccessRatioCard: typeof import('./src/components/usage/UsageSuccessRatioCard.vue')['default']
+    UsageTrendCard: typeof import('./src/components/usage/UsageTrendCard.vue')['default']
   }
 }

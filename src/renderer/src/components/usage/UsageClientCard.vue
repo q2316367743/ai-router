@@ -18,7 +18,7 @@
  * （见 pages/home/index.vue），本组件只负责展示。
  */
 import { computed } from 'vue'
-import type { UsageClientStats } from '@common/types'
+import type { DashboardCardContext } from './cardTypes'
 import UsageChartCard from './UsageChartCard.vue'
 import { buildTopBarOption } from '@/components/EChart/options'
 import { useChartPalette } from '@/components/EChart/tokens'
@@ -31,13 +31,13 @@ const CLIENT_HINT =
 /** 条形图保留的来源条数上限：按请求数取前 N，其余合并为「其他」 */
 const CLIENT_LIMIT = 6
 
-const props = defineProps<{ data: UsageClientStats | null }>()
+const props = defineProps<{ ctx: DashboardCardContext }>()
 
 const palette = useChartPalette()
 
 /** 前 6 名 + 其他（与供应商条形图同一取舍） */
 const chart = computed(() => {
-  const items = props.data?.items ?? []
+  const items = props.ctx.clients?.items ?? []
   if (items.length === 0) return null
   const top = items.slice(0, CLIENT_LIMIT)
   const names = top.map((item) => item.name)
@@ -57,6 +57,6 @@ const option = computed(() => {
 })
 
 const height = computed(() =>
-  Math.max(120, Math.min((props.data?.items.length ?? 0) + 1, 7) * 28 + 24)
+  Math.max(120, Math.min((props.ctx.clients?.items.length ?? 0) + 1, 7) * 28 + 24)
 )
 </script>

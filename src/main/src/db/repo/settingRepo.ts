@@ -1,5 +1,6 @@
 import { nanoid } from 'nanoid'
 import { LRUCache } from 'lru-cache'
+import { eq } from 'drizzle-orm'
 import type { ServiceConfig } from '@common/types'
 import { db } from '../client'
 import { settings } from '../schema'
@@ -66,4 +67,16 @@ function upsert(key: string, value: string): void {
     .values({ key, value })
     .onConflictDoUpdate({ target: settings.key, set: { value } })
     .run()
+}
+
+/** 通用键值读（UI 偏好类配置）：键不存在返回 null；读频低，不走 service 配置缓存 */
+export function getSetting(key: string): string | null {
+  const row = db().select().from(settings).where(eq(settings.key, key)).get()
+  return row?.value ?? null
+}
+
+/** 通用键值写：写后清 service 配置缓存，防止通用键与 service 键交叉时读到旧值 */
+export function setSetting(key: string, value: string): void {
+  upsert(key, value)
+  configCache.clear()
 }

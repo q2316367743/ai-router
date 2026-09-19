@@ -34,11 +34,15 @@
  * 为 0 的分段不展示（由 useUsageStats 过滤）。该口径说明原在卡片头部，现移到页脚。
  * 四段各有语义色，因此本卡不用分档色，也不给状态胶囊（构成没有好坏）。
  */
+import { computed } from 'vue'
+import type { DashboardCardContext } from './cardTypes'
 import type { CompositionSegment } from './useUsageStats'
 import MetricCard from './MetricCard.vue'
 import { formatTokens } from '@/utils/format'
 
-defineProps<{ segments: CompositionSegment[] }>()
+const props = defineProps<{ ctx: DashboardCardContext }>()
+
+const segments = computed<CompositionSegment[]>(() => props.ctx.stats.composition.value)
 
 const FOOTER_NOTE = '条宽以最大值为 100%'
 

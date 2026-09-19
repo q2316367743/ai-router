@@ -5,6 +5,7 @@ import { registerModelIpc } from '$/ipc/modelIpc'
 import { registerProviderIpc } from '$/ipc/providerIpc'
 import { registerQuotaIpc } from '$/ipc/quotaIpc'
 import { registerServiceIpc } from '$/ipc/serviceIpc'
+import { registerSettingIpc } from '$/ipc/settingIpc'
 import { registerTrayIpc } from '$/ipc/trayIpc'
 import { registerUsageIpc } from '$/ipc/usageIpc'
 
@@ -18,6 +19,7 @@ export function registerIpc(): void {
   registerProviderIpc()
   registerModelIpc()
   registerServiceIpc()
+  registerSettingIpc()
   registerLogIpc()
   registerUsageIpc()
   registerQuotaIpc()

@@ -1,21 +1,26 @@
 <template>
   <div class="quota-card" :class="{ 'opacity-60': item.enabled === false }">
     <div class="quota-card__header">
-      <div class="flex min-w-0 items-center gap-8px">
-        <span class="truncate text-15px font-600" :title="item.providerName">{{ item.providerName }}</span>
+      <div class="quota-card__name-row">
+        <span class="quota-card__name" :title="item.providerName">{{ item.providerName }}</span>
         <t-tag variant="outline" size="small">{{ item.strategyLabel }}</t-tag>
         <t-tag v-if="item.enabled === false" theme="warning" variant="light" size="small">已停用</t-tag>
+        <t-button
+          class="quota-card__refresh"
+          variant="text"
+          shape="square"
+          size="small"
+          :loading="refreshing"
+          title="刷新该提供商"
+          @click="emit('refresh', item.providerId)"
+        >
+          <template #icon><t-icon name="refresh" /></template>
+        </t-button>
       </div>
-      <t-button
-        variant="text"
-        shape="square"
-        size="small"
-        :loading="refreshing"
-        title="刷新该提供商"
-        @click="emit('refresh', item.providerId)"
-      >
-        <template #icon><t-icon name="refresh" /></template>
-      </t-button>
+      <div class="quota-card__meta">
+        <span>{{ updatedText }}</span>
+        <span v-if="summaryText" class="quota-card__summary" :title="summaryText">{{ summaryText }}</span>
+      </div>
     </div>
 
     <t-alert v-if="item.error" theme="error" class="mt-8px">
@@ -23,43 +28,26 @@
     </t-alert>
 
     <template v-if="snapshot">
-      <div class="mt-12px flex flex-col gap-12px">
-        <div v-for="win in visibleWindows" :key="win.label">
-          <div class="mb-4px flex items-center justify-between text-12px">
-            <span class="text-td-secondary">{{ win.label }}</span>
-            <span class="text-td-secondary">{{ win.resetText }}</span>
-          </div>
-          <t-progress
-            :percentage="win.usedPercent"
-            :color="progressColor(win.usedPercent)"
-            :stroke-width="8"
-            :label="`${win.usedPercent.toFixed(0)}%`"
-          />
-        </div>
+      <div v-if="windows.length" class="quota-card__windows">
+        <QuotaWindowRow v-for="w in windows" :key="w.key" :title="w.title" :win="w.win" />
       </div>
 
-      <div v-if="costText" class="mt-12px flex items-center gap-6px text-13px">
-        <t-icon name="wallet" class="text-td-secondary" />
-        <span>{{ costText }}</span>
-      </div>
-
-      <div v-for="section in snapshot.details ?? []" :key="section.title" class="mt-12px">
-        <div class="mb-4px text-12px text-td-secondary">{{ section.title }}</div>
-        <div v-for="row in section.rows" :key="row.label" class="flex justify-between text-12px leading-20px">
-          <span class="text-td-secondary">{{ row.label }}</span>
-          <span class="text-right">
-            {{ row.value }}
-            <span v-if="row.secondaryValue" class="text-td-secondary">（{{ row.secondaryValue }}）</span>
+      <div v-for="section in snapshot.details ?? []" :key="section.title" class="quota-card__section">
+        <div class="quota-card__section-title">{{ section.title }}</div>
+        <div v-for="row in section.rows" :key="row.label" class="quota-card__row">
+          <span class="quota-card__row-label">{{ row.label }}</span>
+          <span class="quota-card__row-value">
+            <span>{{ row.value }}</span>
+            <span v-if="row.secondaryValue" class="quota-card__row-secondary">{{ row.secondaryValue }}</span>
           </span>
         </div>
+        <QuotaDetailChart v-if="section.chart" :chart="section.chart" />
       </div>
 
-      <div v-if="identityText" class="mt-12px truncate text-12px text-td-secondary" :title="identityText">
-        {{ identityText }}
-      </div>
+      <div v-if="identityText" class="quota-card__identity" :title="identityText">{{ identityText }}</div>
     </template>
 
-    <div v-else-if="!item.error" class="mt-16px flex items-center gap-8px text-13px text-td-secondary">
+    <div v-else-if="!item.error" class="quota-card__placeholder">
       <template v-if="refreshing"><t-loading size="small" text="查询中…" loading /></template>
       <span v-else-if="item.enabled === false">提供商已停用，不参与余量查询</span>
       <span v-else>等待首次查询（页面打开时会自动补查）</span>
@@ -73,7 +61,10 @@
 </template>
 
 <script lang="ts" setup>
-import type { ProviderQuotaInfo, QuotaRateWindow } from '@common/types'
+import type { ProviderQuotaInfo, QuotaCostSnapshot, QuotaRateWindow } from '@common/types'
+import { formatTime } from '@/utils/format'
+import QuotaDetailChart from './QuotaDetailChart.vue'
+import QuotaWindowRow from './QuotaWindowRow.vue'
 
 const props = defineProps<{
   item: ProviderQuotaInfo
@@ -87,71 +78,83 @@ const emit = defineEmits<{
 const snapshot = computed(() => props.item.snapshot)
 
 interface CardWindow {
-  label: string
+  key: string
+  title: string
   win: QuotaRateWindow
-  usedPercent: number
-  resetText: string
 }
 
-/** 主/次/第三 + 具名附加窗口，扁平成卡片行 */
-const visibleWindows = computed<CardWindow[]>(() => {
+/** 主/次/第三 + 具名附加窗口，扁平成面板行 */
+const windows = computed<CardWindow[]>(() => {
   const snap = snapshot.value
   if (!snap) return []
   const rows: CardWindow[] = []
-  const push = (label: string, win: QuotaRateWindow | null | undefined): void => {
-    if (!win) return
-    rows.push({ label, win, usedPercent: win.usedPercent, resetText: resetTextOf(win) })
+  const push = (fallback: string, key: string, win: QuotaRateWindow | null | undefined): void => {
+    if (win) rows.push({ key, title: windowTitle(fallback, win), win })
   }
-  push('主窗口', snap.primary)
-  push('次窗口', snap.secondary)
-  push('第三窗口', snap.tertiary)
-  for (const extra of snap.extraWindows ?? []) push(extra.title, extra.window)
+  push('主窗口', 'primary', snap.primary)
+  push('次窗口', 'secondary', snap.secondary)
+  push('第三窗口', 'tertiary', snap.tertiary)
+  for (const extra of snap.extraWindows ?? []) {
+    rows.push({ key: extra.id, title: extra.title || windowTitle('附加窗口', extra.window), win: extra.window })
+  }
   return rows
 })
 
-/** 重置说明 + 剩余倒计时（resetsAt 在未来才显示倒计时） */
-function resetTextOf(win: QuotaRateWindow): string {
-  const parts: string[] = []
-  if (win.resetDescription) parts.push(win.resetDescription)
-  if (win.resetsAt && win.resetsAt > Date.now()) parts.push(`${countdown(win.resetsAt)}后重置`)
-  else if (win.resetsAt && win.resetsAt <= Date.now()) parts.push('即将重置')
-  return parts.join(' · ')
+/** 窗口标题按 windowMinutes 归一（5 小时 / 每周 / 每月），否则回退策略说明或序号名 */
+function windowTitle(fallback: string, win: QuotaRateWindow): string {
+  const minutes = win.windowMinutes
+  if (!minutes) return win.resetDescription || fallback
+  if (minutes === 300) return '5 小时'
+  if (minutes === 24 * 60) return '每日'
+  if (minutes === 7 * 24 * 60) return '每周'
+  if (minutes === 30 * 24 * 60) return '每月'
+  if (minutes % 1440 === 0) return `${minutes / 1440} 天`
+  if (minutes % 60 === 0) return `${minutes / 60} 小时`
+  return `${minutes} 分钟`
 }
 
-function countdown(target: number): string {
-  const totalMinutes = Math.max(1, Math.ceil((target - Date.now()) / 60_000))
-  const days = Math.floor(totalMinutes / 1440)
-  const hours = Math.floor(totalMinutes / 60) % 24
-  const minutes = totalMinutes % 60
-  if (days > 0) return hours > 0 ? `${days}天${hours}时` : `${days}天`
-  if (hours > 0) return minutes > 0 ? `${hours}时${minutes}分` : `${hours}时`
-  return `${minutes}分`
-}
+const updatedText = computed(() =>
+  props.item.queriedAt ? `${relativeTime(props.item.queriedAt)}已更新` : '等待首次查询'
+)
 
-const costText = computed(() => {
-  const cost = snapshot.value?.cost
-  if (!cost) return ''
-  const parts: string[] = []
-  if (cost.balance != null) parts.push(`余额 ${cost.balance}`)
-  if (cost.used) parts.push(`已用 ${cost.used}`)
-  if (cost.limit != null) parts.push(`上限 ${cost.limit}`)
-  return parts.length ? `${parts.join(' · ')} ${cost.currency}（${cost.period ?? '余额'}）` : ''
+/** 右上摘要：优先花费（$used / $limit），无则套餐名 */
+const summaryText = computed(() => {
+  const snap = snapshot.value
+  if (!snap) return ''
+  const cost = snap.cost ? costSummaryOf(snap.cost) : ''
+  return cost || snap.identity?.loginMethod || ''
 })
 
+/** 账号标识行（套餐名已用于右上摘要，此处只留账号信息） */
 const identityText = computed(() => {
   const identity = snapshot.value?.identity
   if (!identity) return ''
-  return [identity.loginMethod, identity.organization, identity.email].filter(Boolean).join(' · ')
+  return [identity.email, identity.organization, identity.accountID].filter(Boolean).join(' · ')
 })
 
-function progressColor(percent: number): string {
-  if (percent >= 90) return 'var(--td-error-color)'
-  if (percent >= 70) return 'var(--td-warning-color)'
-  return 'var(--td-brand-color)'
+function currencyPrefix(currency: string): string {
+  const code = currency.toUpperCase()
+  if (code === 'USD') return '$'
+  if (code === 'CNY' || code === 'RMB') return '¥'
+  return currency ? `${currency} ` : ''
 }
 
-function formatTime(ms: number): string {
-  return new Date(ms).toLocaleTimeString('zh-CN', { hour12: false })
+function costSummaryOf(cost: QuotaCostSnapshot): string {
+  const prefix = currencyPrefix(cost.currency)
+  // 余额优先：DeepSeek 这类账户余额型会带 used=0（0 也是「有值」），不能用 != null 判断
+  if (cost.balance != null) return `余额 ${prefix}${cost.balance}`
+  if (cost.limit != null) return `${prefix}${cost.used} / ${prefix}${cost.limit}`
+  if (cost.used) return `${prefix}${cost.used}`
+  return ''
+}
+
+function relativeTime(ms: number): string {
+  const minutes = Math.floor((Date.now() - ms) / 60_000)
+  if (minutes < 1) return '刚刚'
+  if (minutes < 60) return `${minutes}分钟前`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}小时前`
+  return `${Math.floor(hours / 24)}天前`
 }
 </script>
 
@@ -169,9 +172,106 @@ function formatTime(ms: number): string {
 
   &__header {
     display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  &__name-row {
+    display: flex;
     align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  &__name {
+    overflow: hidden;
+    font-size: 16px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__refresh {
+    flex: none;
+    margin-left: auto;
+  }
+
+  &__meta {
+    display: flex;
+    align-items: baseline;
     justify-content: space-between;
     gap: 8px;
+    font-size: 12px;
+    color: var(--td-text-color-secondary);
+  }
+
+  &__summary {
+    flex: none;
+    max-width: 60%;
+    overflow: hidden;
+    text-align: right;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__windows {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 16px;
+  }
+
+  &__section {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--td-component-stroke);
+  }
+
+  &__section-title {
+    margin-bottom: 6px;
+    font-size: 12px;
+    color: var(--td-text-color-secondary);
+  }
+
+  &__row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 12px;
+    line-height: 20px;
+  }
+
+  &__row-label {
+    color: var(--td-text-color-secondary);
+  }
+
+  &__row-value {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    text-align: right;
+  }
+
+  &__row-secondary {
+    color: var(--td-text-color-secondary);
+  }
+
+  &__identity {
+    margin-top: 12px;
+    overflow: hidden;
+    font-size: 12px;
+    color: var(--td-text-color-placeholder);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__placeholder {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 16px;
+    font-size: 13px;
+    color: var(--td-text-color-secondary);
   }
 
   &__footer {

@@ -13,7 +13,14 @@
       </div>
     </div>
 
-    <t-table row-key="id" :data="rows" :columns="columns" :loading="loading" hover max-height="440px">
+    <t-table
+      row-key="id"
+      :data="rows"
+      :columns="columns"
+      :loading="loading"
+      hover
+      max-height="440px"
+    >
       <template #credential="{ row }">
         <t-tag :theme="CREDENTIAL_META[row.credential].theme" variant="light" size="small">
           {{ CREDENTIAL_META[row.credential].label }}
@@ -26,8 +33,13 @@
       </template>
       <template #op="{ row }">
         <template v-if="!row.builtin">
-          <t-button variant="text" size="small" theme="primary" @click="openEdit(row)">编辑</t-button>
-          <t-popconfirm content="归档后该策略将不可用，且绑定的提供商会解除绑定，确定归档？" @confirm="archive(row)">
+          <t-button variant="text" size="small" theme="primary" @click="openEdit(row)"
+            >编辑</t-button
+          >
+          <t-popconfirm
+            content="归档后该策略将不可用，且绑定的提供商会解除绑定，确定归档？"
+            @confirm="archive(row)"
+          >
             <t-button variant="text" size="small" theme="danger">归档</t-button>
           </t-popconfirm>
         </template>
@@ -52,7 +64,10 @@ const strategies = ref<QuotaStrategyInfo[]>([])
 const plugins = ref<QuotaPluginInfo[]>([])
 const loading = ref(false)
 
-const CREDENTIAL_META: Record<string, { label: string; theme: 'default' | 'primary' | 'warning' | 'success' }> = {
+const CREDENTIAL_META: Record<
+  string,
+  { label: string; theme: 'default' | 'primary' | 'warning' | 'success' }
+> = {
   apiKey: { label: 'API Key', theme: 'default' },
   token: { label: '访问令牌', theme: 'primary' },
   cookie: { label: 'Cookie', theme: 'warning' },
@@ -95,6 +110,7 @@ async function refresh(): Promise<void> {
 
 function openCreate(): void {
   openPluginDrawer(null, refresh)
+  emit('close')
 }
 
 function openEdit(row: CatalogRow): void {

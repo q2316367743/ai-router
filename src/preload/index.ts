@@ -5,6 +5,7 @@ import { dbApi } from '~/modules/db/db'
 import { providerApi } from '~/modules/provider/provider'
 import { modelApi } from '~/modules/model/model'
 import { serviceApi } from '~/modules/service/service'
+import { settingApi } from '~/modules/setting/setting'
 import { logApi } from '~/modules/log/log'
 import { trayApi } from '~/modules/tray/tray'
 import { usageApi } from '~/modules/usage/usage'
@@ -19,6 +20,7 @@ const preload = {
   provider: providerApi,
   model: modelApi,
   service: serviceApi,
+  setting: settingApi,
   log: logApi,
   usage: usageApi,
   quota: quotaApi,

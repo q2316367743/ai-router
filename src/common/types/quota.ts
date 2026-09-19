@@ -39,9 +39,19 @@ export interface QuotaDetailRow {
   secondaryValue?: string
 }
 
+/** 明细分区内嵌图表（策略经 details[].chart 提供，CodexBar 契约同构） */
+export interface QuotaDetailChart {
+  kind: 'bars' | 'line'
+  title?: string | null
+  /** 数值单位（展示在图表左上角，如 tokens） */
+  unit?: string | null
+  points: Array<{ label: string; value: number }>
+}
+
 export interface QuotaDetailSection {
   title: string
   rows: QuotaDetailRow[]
+  chart?: QuotaDetailChart | null
 }
 
 export interface QuotaIdentity {

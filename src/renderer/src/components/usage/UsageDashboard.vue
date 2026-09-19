@@ -1,6 +1,7 @@
 <template>
   <div class="dashboard">
-    <!-- 维度切换（.fluent-segmented：Fluent 分段控件，见 assets/style/tdesign-cover.less）+ 筛选 -->
+    <!-- 维度切换（.fluent-segmented：Fluent 分段控件，见 assets/style/tdesign-cover.less）+ 筛选。
+         看板是纯展示面，不放任何编辑元素：卡片布局配置在设置页「看板卡片」卡，经广播同步到本组件 -->
     <div class="flex items-center justify-between gap-8px mb-12px flex-wrap">
       <t-radio-group
         v-model="range"
@@ -35,57 +36,22 @@
 
     <!-- delay 抑制快速请求的闪烁；托盘紧凑模式下不盖遮罩（面板底是亚克力，遮罩会整块盖住） -->
     <t-loading :loading="loading" :show-overlay="!compact" :delay="200" size="small">
-      <div class="flex flex-col gap-12px">
-        <!-- 请求数 / 成功率 / 平均延迟 / 总 tokens（窄面板下 2 列两行，避免挤压） -->
-        <div class="grid gap-10px" :class="compact ? 'grid-cols-2' : 'grid-cols-4'">
-          <UsageStatCard
-            v-for="card in cards"
-            :key="card.key"
-            :config="card"
-            :value-size="compact ? 22 : 26"
-          />
-        </div>
+      <!-- 用户把全部卡片隐藏时不留白板：给一行指引（配置入口在设置页） -->
+      <div v-if="visibleCards.length === 0" class="empty-hint">
+        暂无显示中的卡片，可在主窗口设置页「看板卡片」中开启
+      </div>
 
-        <!-- 柱状（请求数）+ 折线（总 token / 缓存 token） -->
-        <UsageChartCard
-          title="请求与用量趋势"
-          icon="chart-combo"
-          :option="trendOption"
-          :height="compact ? 180 : 240"
+      <!-- 注册表驱动的单一栅格：指标卡占 1 格，图表卡整行，环形卡半行；
+           不用 dense 流——隐藏卡片留下的空位如实呈现，保持用户排定的顺序 -->
+      <div v-else class="grid gap-10px" :class="compact ? 'grid-cols-2' : 'grid-cols-4'">
+        <component
+          :is="card.def.component"
+          v-for="card in visibleCards"
+          :key="card.def.id"
+          :ctx="ctx"
+          v-bind="card.def.extraProps"
+          :class="spanClass(card.def.span)"
         />
-
-        <!-- 按供应商分线的 token 趋势（仅小时粒度，托盘 24 小时维度核心图） -->
-        <UsageChartCard
-          v-if="providerTrendOption"
-          title="供应商 Tokens 趋势"
-          icon="chart-line"
-          :option="providerTrendOption"
-          :height="compact ? 160 : 220"
-        />
-
-        <!-- 活跃度热力图（主窗口整年，托盘 compact 下缩到近 12 周） -->
-        <UsageActivityCard :activity="activity" :compact="compact" />
-
-        <!-- 令牌构成（含缓存占比） -->
-        <UsageCompositionCard :segments="composition" />
-
-        <!-- 环形指标：成功率 / 失败率 与 缓存占比 -->
-        <UsageRatioCard :totals="totals" :cache-tokens="cacheTokens" />
-
-        <!-- 供应商 token 数 -->
-        <UsageChartCard
-          v-if="providerOption"
-          title="供应商 Tokens"
-          icon="chart-bar"
-          :option="providerOption"
-          :height="providerHeight"
-        />
-
-        <!-- 来源 Agent 请求数（固定近七天窗口，独立于上方的维度切换与筛选；数据由父组件按节拍统一取） -->
-        <UsageClientCard v-if="showClients" :data="clients" />
-
-        <!-- 模型速度折线（同上） -->
-        <UsageSpeedCard v-if="showSpeed" :data="speed" />
       </div>
     </t-loading>
   </div>
@@ -93,35 +59,26 @@
 
 <script lang="ts" setup>
 /**
- * 统计看板主体：主窗口首页与托盘面板共用同一套卡片与图表。
+ * 统计看板主体：主窗口首页与托盘面板共用同一套卡片，渲染完全由卡片注册表驱动。
  *
  * - 统计数据由父组件经 useUsageStats 创建后传入（stats prop），避免同一数据两处拉取；
  *   首页需要把成功率放进顶部系统状态行，故不能由本组件私有取数。
- * - compact=true 时压缩图表高度以适配托盘窄面板。
- * - showSpeed 单独开关：模型速度折线的数据源与窗口都独立于维度切换，托盘窄面板也不放下多线图。
+ * - 卡片清单、显示与顺序来自 cardRegistry × useDashboardLayout（按 surface 独立配置），
+ *   本组件不写死任何一张卡片；每张卡片自给自足，只收 ctx（见 cardTypes.ts）。
+ * - compact=true 时压缩图表高度以适配托盘窄面板（栅格降为 2 列）。
  */
 import { computed } from 'vue'
 import type { UsageClientStats, UsageModelSpeed, UsageRangeKey } from '@common/types'
 import type { UseUsageStatsResult } from './useUsageStats'
-import UsageStatCard from './UsageStatCard.vue'
-import UsageChartCard from './UsageChartCard.vue'
-import UsageActivityCard from './UsageActivityCard.vue'
-import UsageCompositionCard from './UsageCompositionCard.vue'
-import UsageRatioCard from './UsageRatioCard.vue'
-import UsageClientCard from './UsageClientCard.vue'
-import UsageSpeedCard from './UsageSpeedCard.vue'
-import { useUsageCards } from './useUsageCards'
-import {
-  buildProviderTrendOption,
-  buildRequestTokenOption,
-  buildTopBarOption
-} from '@/components/EChart/options'
-import { useChartPalette } from '@/components/EChart/tokens'
+import type { DashboardCardContext, DashboardCardSpan } from './cardTypes'
+import type { DashboardSurface } from '@common/types'
+import { useDashboardLayout } from './useDashboardLayout'
 
 const props = withDefaults(
   defineProps<{
+    surface: DashboardSurface
     stats: UseUsageStatsResult
-    /** 模型速度折线数据（固定近七天窗口，由父组件按刷新节拍统一取数；托盘面板不展示） */
+    /** 模型速度趋势数据（固定近七天窗口，由父组件按刷新节拍统一取数；仅首页取） */
     speed?: UsageModelSpeed | null
     /** 来源 Agent 请求数数据（同上） */
     clients?: UsageClientStats | null
@@ -129,10 +86,6 @@ const props = withDefaults(
     ranges?: UsageRangeKey[]
     /** 是否展示供应商 / 模型筛选 */
     showFilters?: boolean
-    /** 是否展示模型速度折线（固定近七天，仅主窗口首页开启） */
-    showSpeed?: boolean
-    /** 是否展示来源 Agent 请求数条形图（固定近七天，仅主窗口首页开启） */
-    showClients?: boolean
     /** 紧凑模式（托盘窄面板）：图表压矮、统计卡两列、维度切换等宽铺满 */
     compact?: boolean
   }>(),
@@ -141,8 +94,6 @@ const props = withDefaults(
     clients: null,
     ranges: () => ['today', 'last24h', 'last7d', 'last30d'],
     showFilters: true,
-    showSpeed: false,
-    showClients: false,
     compact: false
   }
 )
@@ -154,23 +105,27 @@ const RANGE_LABELS: Record<UsageRangeKey, string> = {
   last30d: '近 30 天'
 }
 
-const palette = useChartPalette()
+// stats 的每个字段本身就是 ref/computed（useUsageStats 的返回值），卡片内部直接按 ref 取值即保持响应性
+const { range, providerName, publicModel, loading, filterOptions } = props.stats
 
-// stats 的每个字段本身就是 ref/computed（useUsageStats 的返回值），直接解构即保持响应性，
-// 供模板直接绑定（无需再写 stats.range.value 这类层层取值）
-const {
-  range,
-  providerName,
-  publicModel,
-  loading,
-  overview,
-  filterOptions,
-  cacheTokens,
-  composition
-} = props.stats
+/** 看板传给每张卡片的渲染上下文：卡片据此自取数据与界面形态 */
+const ctx = computed<DashboardCardContext>(() => ({
+  stats: props.stats,
+  compact: props.compact,
+  speed: props.speed,
+  clients: props.clients
+}))
 
-/** 四张统计卡的展示配置（图标 / 胶囊 / 迷你图 / 页脚）在 useUsageCards 里派生 */
-const cards = useUsageCards(props.stats)
+/** 注册表 × 用户布局配置合并出的卡片序列（含隐藏卡，隐藏卡保留位置） */
+const { cards } = useDashboardLayout(props.surface)
+const visibleCards = computed(() => cards.value.filter((card) => card.visible))
+
+/** 栅格跨度 → 类名：half 在 2 列栅格（托盘）下恰为半行，无需跨列 */
+function spanClass(span: DashboardCardSpan): string {
+  if (span === 'full') return 'col-span-full'
+  if (span === 'half') return props.compact ? '' : 'col-span-2'
+  return ''
+}
 
 const rangeOptions = computed(() =>
   props.ranges.map((value) => ({ value, label: RANGE_LABELS[value] }))
@@ -182,52 +137,17 @@ const providerOptions = computed(() =>
 const modelOptions = computed(() =>
   filterOptions.value.models.map((value) => ({ value, label: value }))
 )
-
-const totals = computed(() => overview.value.totals)
-const activity = computed(() => overview.value.activity)
-
-const trendOption = computed(() => {
-  const series = overview.value.series
-  return buildRequestTokenOption(
-    palette.value,
-    series.labels,
-    series.requestCount,
-    series.totalTokens,
-    series.cacheTokens
-  )
-})
-
-/** 按供应商分线的 token 趋势：仅小时粒度（今天 / 近 24 小时）展示，日粒度下折线过密 */
-const providerTrendOption = computed(() => {
-  const series = overview.value.series
-  if (series.granularity !== 'hour') return null
-  const lines = series.byProviderTokens.filter((line) => line.data.some((value) => value > 0))
-  if (lines.length === 0) return null
-  return buildProviderTrendOption(palette.value, series.labels, lines)
-})
-
-/** 供应商条形图：取 token 前 6 名，其余合并为「其他」 */
-const providerOption = computed(() => {
-  const providers = overview.value.providers.filter((item) => item.totalTokens > 0)
-  if (providers.length === 0) return null
-  const top = providers.slice(0, 6)
-  const rest = providers.slice(6)
-  const names = top.map((item) => item.key)
-  const values = top.map((item) => item.totalTokens)
-  if (rest.length > 0) {
-    names.push('其他')
-    values.push(rest.reduce((acc, item) => acc + item.totalTokens, 0))
-  }
-    return buildTopBarOption(palette.value, names, values)
-})
-
-const providerHeight = computed(() =>
-  Math.max(120, Math.min(overview.value.providers.length + 1, 7) * 28 + 24)
-)
 </script>
 
 <style scoped lang="less">
 .dashboard {
   color: var(--td-text-color-primary);
+}
+
+.empty-hint {
+  padding: 32px 0;
+  font-size: 12px;
+  text-align: center;
+  color: var(--td-text-color-placeholder);
 }
 </style>
