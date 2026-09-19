@@ -1,5 +1,11 @@
 <template>
   <div class="heat-wrap">
+    <!-- 月份标签行：与热力矩阵同一 flex 结构（左侧占位 + 每周一个槽位），标签落在月份切换的列上 -->
+    <div v-if="weeks.length > 0" class="month-row">
+      <span class="month-spacer"></span>
+      <span v-for="(label, wi) in monthLabels" :key="wi" class="month-slot">{{ label }}</span>
+    </div>
+
     <!-- 热力矩阵：列为周，行为星期（GitHub 提交图排布）；列宽自适应铺满卡片 -->
     <div class="heat-grid">
       <div class="weekday-column">
@@ -76,6 +82,27 @@ const weekdayLabels = computed(() => {
   return ordered
 })
 
+/**
+ * 月份标签（每周一格，无标签为空串）：月份在某一列首次出现时标注「N月」。
+ * 相邻标签至少隔 3 列，窗口放不下时跳过（与 GitHub 提交图行为一致）。
+ */
+const monthLabels = computed<string[]>(() => {
+  const labels = weeks.value.map(() => '')
+  let lastMonth = -1
+  let lastLabelColumn = -3
+  weeks.value.forEach((week, i) => {
+    const first = week.cells.find((cell) => cell !== null)
+    if (!first) return
+    const month = Number(first.date.slice(5, 7))
+    if (month !== lastMonth && i - lastLabelColumn >= 3) {
+      labels[i] = `${month}月`
+      lastMonth = month
+      lastLabelColumn = i
+    }
+  })
+  return labels
+})
+
 /** 请求数 → 热度档位（0 档为无请求的空色） */
 function levelOf(requestCount: number): number {
   if (requestCount <= 0) return 0
@@ -148,10 +175,35 @@ function weekLines(cells: Array<HeatCell | null>): string[] {
   gap: 3px;
 }
 
+/* 月份标签行与热力矩阵共用同一 flex 骨架，槽位宽度逐列对齐 */
+.month-row {
+  display: flex;
+  gap: 3px;
+  margin-bottom: 4px;
+}
+
+.month-spacer {
+  width: 10px;
+  flex-shrink: 0;
+  margin-right: 3px;
+}
+
+/* 文本超宽时向右溢出不换行：标签间距已保证 ≥3 列，不会互相压字 */
+.month-slot {
+  flex: 1;
+  max-width: 40px;
+  min-width: 0;
+  font-size: 9px;
+  line-height: 1;
+  color: var(--td-text-color-placeholder);
+  white-space: nowrap;
+}
+
 .weekday-column {
   display: grid;
   grid-template-rows: repeat(7, 1fr);
   gap: 3px;
+  width: 10px;
   flex-shrink: 0;
   margin-right: 3px;
 }

@@ -12,6 +12,7 @@ export function listProviders(): ProviderInfo[] {
       id: providers.id,
       name: providers.name,
       protocol: providers.protocol,
+      kind: providers.kind,
       baseUrl: providers.baseUrl,
       apiKey: providers.apiKey,
       enabled: providers.enabled,
@@ -35,6 +36,7 @@ export function createProvider(input: ProviderInput): string {
       id,
       name: input.name,
       protocol: input.protocol,
+      kind: input.kind ?? null,
       baseUrl: input.baseUrl,
       apiKey: input.apiKey,
       enabled: input.enabled,
@@ -70,6 +72,8 @@ export function updateProvider(input: ProviderInput): void {
       .set({
         name: input.name,
         protocol: input.protocol,
+        // 显式写入（含 null）：支持「内置改回自定义」的清除
+        kind: input.kind ?? null,
         baseUrl: input.baseUrl,
         apiKey: input.apiKey,
         enabled: input.enabled,

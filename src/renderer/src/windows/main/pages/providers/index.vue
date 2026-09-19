@@ -22,6 +22,14 @@
         :row-class-name="rowClassName"
         hover
       >
+        <template #name="{ row }">
+          <div class="flex items-center gap-6px">
+            <span class="min-w-0 truncate" :title="row.name">{{ row.name }}</span>
+            <t-tag v-if="row.kind" variant="outline" size="small">
+              {{ PRESET_LABELS[row.kind] }}
+            </t-tag>
+          </div>
+        </template>
         <template #protocol="{ row }">
           <t-tag :theme="PROTOCOL_META[row.protocol].theme" variant="outline" size="small">
             {{ PROTOCOL_META[row.protocol].label }}
@@ -66,7 +74,8 @@
 import type { ProviderInfo, ProviderProtocol } from '@common/types'
 import { maskKey } from '@/utils/format'
 import PageLayout from '@/components/PageLayout/PageLayout.vue'
-import { openProviderDialog } from './modals/ProviderDialog'
+import { openProviderDrawer } from './modals/ProviderDrawer'
+import { PRESET_LABELS } from './presets'
 import { MessageUtil } from '@/utils/modal'
 
 const list = ref<ProviderInfo[]>([])
@@ -88,7 +97,7 @@ const PROTOCOL_META: Record<
 }
 
 const columns = [
-  { colKey: 'name', title: '名称', width: 140 },
+  { colKey: 'name', title: '名称', width: 180 },
   { colKey: 'protocol', title: '协议', width: 150 },
   { colKey: 'baseUrl', title: 'Base URL', ellipsis: true },
   { colKey: 'apiKey', title: 'API Key', width: 150 },
@@ -117,11 +126,11 @@ async function refresh(): Promise<void> {
 }
 
 function openCreate(): void {
-  openProviderDialog(null, refresh)
+  openProviderDrawer(null, refresh)
 }
 
 function openEdit(row: ProviderInfo): void {
-  openProviderDialog(row, refresh)
+  openProviderDrawer(row, refresh)
 }
 
 async function toggleEnabled(row: ProviderInfo, enabled: boolean): Promise<void> {
@@ -130,6 +139,7 @@ async function toggleEnabled(row: ProviderInfo, enabled: boolean): Promise<void>
       id: row.id,
       name: row.name,
       protocol: row.protocol,
+      kind: row.kind,
       baseUrl: row.baseUrl,
       apiKey: row.apiKey,
       enabled

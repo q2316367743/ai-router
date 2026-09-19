@@ -30,10 +30,11 @@ import { dayLabel, hourLabel, todayKey } from '$/utils/date'
 
 /** usage_hourly 滚动保留窗口（天，含当天）：覆盖「今天」与「近 24 小时」两个维度 */
 const HOURLY_RETENTION_DAYS = 7
-/** 活跃度热力图短窗口（天）：维度不足 30 天时使用，避免退化为单格 */
+/** 日粒度序列的桶数（天）：近七天维度取 SHORT，近 30 天维度取 LONG（活跃度已固定一年，不再共用） */
 const ACTIVITY_DAYS_SHORT = 7
-/** 活跃度热力图长窗口（天）：近 30 天维度使用 */
 const ACTIVITY_DAYS_LONG = 30
+/** 活跃度热力图窗口（天）：固定一年（GitHub 提交图式，今天为最后一格），不随统计维度切换 */
+const ACTIVITY_DAYS_YEAR = 365
 
 type UsageTable = typeof usageDaily | typeof usageHourly
 
@@ -134,11 +135,6 @@ export function resolveRange(range: UsageRangeKey): ResolvedRange {
     startKey: startDay.format('YYYY-MM-DD'),
     endKey: endDay.format('YYYY-MM-DD')
   }
-}
-
-/** 活跃度热力图窗口天数：近 30 天维度取 30 天，其余维度回落 7 天 */
-export function activityDaysOf(range: UsageRangeKey): number {
-  return range === 'last30d' ? ACTIVITY_DAYS_LONG : ACTIVITY_DAYS_SHORT
 }
 
 /**
@@ -333,9 +329,9 @@ function buildSeries(range: ResolvedRange, rows: UsageRow[]): UsageSeries {
   }
 }
 
-/** 活跃度热力图：固定按日粒度从 usage_daily 取数（与所选维度的图表粒度无关） */
-function buildActivity(range: UsageRangeKey): UsageActivity {
-  const days = activityDaysOf(range)
+/** 活跃度热力图：固定按日粒度取近一年（GitHub 提交图式，今天为最后一格），与所选维度的粒度无关 */
+function buildActivity(): UsageActivity {
+  const days = ACTIVITY_DAYS_YEAR
   const endDay = dayjs().startOf('day')
   const startDay = endDay.subtract(days - 1, 'day')
   const startDate = startDay.format('YYYY-MM-DD')
@@ -404,7 +400,7 @@ export function queryUsageOverview(query: UsageQuery): UsageOverview {
     providers: groupBy(rows, (row) => row.providerName),
     models: groupBy(rows, (row) => row.publicModel),
     series: buildSeries(range, rows),
-    activity: buildActivity(query.range)
+    activity: buildActivity()
   }
 }
 

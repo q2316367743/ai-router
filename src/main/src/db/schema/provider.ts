@@ -1,5 +1,5 @@
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
-import type { ProviderProtocol } from '@common/types'
+import type { ProviderKind, ProviderProtocol } from '@common/types'
 
 /** 提供商：上游 AI 服务（protocol 决定接口协议，baseUrl + apiKey 决定目标与认证） */
 export const providers = sqliteTable(
@@ -11,6 +11,8 @@ export const providers = sqliteTable(
       .$type<ProviderProtocol>()
       .notNull()
       .default('openai'),
+    /** 内置提供商类型：null = 自定义（预设快速填写与余量查询按此分发） */
+    kind: text('kind').$type<ProviderKind>(),
     baseUrl: text('base_url').notNull(),
     apiKey: text('api_key').notNull(),
     enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),

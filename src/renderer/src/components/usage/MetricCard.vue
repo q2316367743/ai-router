@@ -67,6 +67,9 @@ withDefaults(
  */
 .metric-card {
   position: relative;
+  /* 纵向 flex：卡片被 grid 等高拉伸时，头部钉顶、数值段以下沉底（见 .metric-value） */
+  display: flex;
+  flex-direction: column;
   padding: 14px 16px;
   border-radius: var(--fluent-radius-card);
   /* 用 background-color 而非 background 简写：简写会把分档渐晕的 background-image 重置掉 */
@@ -106,6 +109,11 @@ withDefaults(
   color: var(--td-text-color-placeholder);
   cursor: help;
   flex-shrink: 0;
+}
+
+/* auto 外边距把「数值 + 可视化 + 页脚」推到卡底：迷你柱(28px)与迷你进度条(6px)高度不同也能下对齐 */
+.metric-value {
+  margin-top: auto;
 }
 
 .metric-viz {

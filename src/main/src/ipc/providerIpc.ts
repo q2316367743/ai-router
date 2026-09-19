@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron'
-import type { ProviderInput, ProviderProtocol } from '@common/types'
+import type { ProviderInput, ProviderKind, ProviderProtocol } from '@common/types'
 import {
   archiveProvider,
   createProvider,
@@ -9,6 +9,8 @@ import {
 } from '../db/repo/providerRepo'
 
 const PROTOCOLS: readonly ProviderProtocol[] = ['openai', 'openai-responses', 'anthropic']
+
+const KINDS: readonly ProviderKind[] = ['zai', 'opencode', 'deepseek', 'siliconflow']
 
 /** 提供商域 IPC：只做参数校验与转发，数据操作在 providerRepo */
 export function registerProviderIpc(): void {
@@ -40,6 +42,7 @@ export function registerProviderIpc(): void {
 function assertProviderInput(input: ProviderInput): void {
   if (!input?.name?.trim()) throw new Error('名称不能为空')
   if (!PROTOCOLS.includes(input?.protocol)) throw new Error('接口类型不合法')
+  if (input?.kind != null && !KINDS.includes(input.kind)) throw new Error('提供商类型不合法')
   if (!input?.baseUrl?.trim()) throw new Error('Base URL 不能为空')
   if (!input?.apiKey?.trim()) throw new Error('API Key 不能为空')
 }

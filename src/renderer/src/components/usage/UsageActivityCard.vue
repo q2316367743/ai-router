@@ -9,7 +9,7 @@
     </div>
 
     <template #viz>
-      <UsageHeatmap :activity="activity" />
+      <UsageHeatmap :activity="view" />
     </template>
   </MetricCard>
 </template>
@@ -18,7 +18,8 @@
 /**
  * 活跃度卡：指标明细 + 热力矩阵（矩阵与图例已拆到 UsageHeatmap）。
  *
- * 四项指标与热力图同窗口口径；窗口文案挂在卡片头部的胶囊上（对应参考图的「日/周/月」位）。
+ * 主窗口展示整年（GitHub 提交图式，今天为最后一格）；compact（托盘窄面板）下
+ * 只取最近 12 周，四项指标按切片重算，保证卡内指标与热力图口径一致。
  * 热力图的五档色是「热度」语义，与好坏/量级分档无关，故本卡不给卡片挂 stat-* 类。
  */
 import { computed } from 'vue'
@@ -27,16 +28,53 @@ import MetricCard from './MetricCard.vue'
 import UsageHeatmap from './UsageHeatmap.vue'
 import { formatTokens } from '@/utils/format'
 
-const props = defineProps<{ activity: UsageActivity }>()
+const props = withDefaults(
+  defineProps<{ activity: UsageActivity; /** 紧凑模式（托盘窄面板）：热力图与指标缩到近 12 周 */ compact?: boolean }>(),
+  { compact: false }
+)
+
+/** 紧凑模式的窗口天数：12 周 × 7 天，约 13 列，400px 面板内格子仍可读 */
+const COMPACT_WINDOW_DAYS = 84
+
+/** 展示口径：compact 且数据满一年时切片最近 84 天，并重算窗口内指标 */
+const view = computed<UsageActivity>(() => {
+  const activity = props.activity
+  if (!props.compact || activity.cells.length <= COMPACT_WINDOW_DAYS) return activity
+  const cells = activity.cells.slice(-COMPACT_WINDOW_DAYS)
+  const first = cells[0]
+  if (!first) return activity
+  let longestStreak = 0
+  let currentStreak = 0
+  let totalTokens = 0
+  for (const cell of cells) {
+    totalTokens += cell.totalTokens
+    if (cell.requestCount > 0) {
+      currentStreak += 1
+      longestStreak = Math.max(longestStreak, currentStreak)
+    } else {
+      currentStreak = 0
+    }
+  }
+  const dailyAverageTokens = totalTokens / cells.length
+  return {
+    startDate: first.date,
+    days: cells.length,
+    cells,
+    longestStreak,
+    dailyAverageTokens,
+    weeklyAverageTokens: dailyAverageTokens * 7,
+    totalTokens
+  }
+})
 
 const windowLabel = computed(() => {
-  const { days, startDate } = props.activity
+  const { days, startDate } = view.value
   if (!startDate || days === 0) return ''
-  return `近 ${days} 天`
+  return days >= 365 ? '近一年' : `近 ${days} 天`
 })
 
 const metrics = computed(() => {
-  const a = props.activity
+  const a = view.value
   return [
     { label: '最长连续', value: `${a.longestStreak} 天` },
     { label: '日均 Tokens', value: formatTokens(Math.round(a.dailyAverageTokens)) },

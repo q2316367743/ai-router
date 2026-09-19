@@ -63,8 +63,8 @@
           :height="compact ? 160 : 220"
         />
 
-        <!-- 活跃度热力图 -->
-        <UsageActivityCard :activity="activity" />
+        <!-- 活跃度热力图（主窗口整年，托盘 compact 下缩到近 12 周） -->
+        <UsageActivityCard :activity="activity" :compact="compact" />
 
         <!-- 令牌构成（含缓存占比） -->
         <UsageCompositionCard :segments="composition" />

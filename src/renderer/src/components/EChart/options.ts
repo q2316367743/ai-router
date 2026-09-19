@@ -29,6 +29,16 @@ function baseTooltip(palette: ChartPalette) {
   }
 }
 
+/** 数值轴刻度大数简写：与 tooltip 共用 formatTokens 阈值（2000000 → 2M） */
+function compactAxisLabel(value: number): string {
+  return formatTokens(value)
+}
+
+/** 在 baseAxis 的 axisLabel 上追加刻度 formatter 的快捷方式 */
+function withCompactLabel(axis: ReturnType<typeof baseAxis>) {
+  return { ...axis, axisLabel: { ...axis.axisLabel, formatter: compactAxisLabel } }
+}
+
 /** 柱状（请求数）+ 折线（总 token / 缓存 token）组合图 */
 export function buildRequestTokenOption(
   palette: ChartPalette,
@@ -58,13 +68,13 @@ export function buildRequestTokenOption(
         type: 'value',
         name: '请求数',
         nameTextStyle: { color: palette.placeholder, fontSize: 10 },
-        ...axis
+        ...withCompactLabel(axis)
       },
       {
         type: 'value',
         name: 'Tokens',
         nameTextStyle: { color: palette.placeholder, fontSize: 10 },
-        ...axis,
+        ...withCompactLabel(axis),
         splitLine: { show: false }
       }
     ],
@@ -230,7 +240,7 @@ export function buildProviderTrendOption(
       data: shown.map((line) => line.name)
     },
     xAxis: { type: 'category', data: labels, boundaryGap: false, ...axis },
-    yAxis: { type: 'value', ...axis },
+    yAxis: { type: 'value', ...withCompactLabel(axis) },
     series: shown.map((line, i) => ({
       name: line.name,
       type: 'line' as const,
@@ -308,14 +318,15 @@ export function buildTopBarOption(
       textStyle: { color: palette.text, fontSize: 12 },
       valueFormatter: (value) => formatTokens(Number(value))
     },
-    xAxis: { type: 'value', ...axis },
+    xAxis: { type: 'value', ...withCompactLabel(axis) },
     yAxis: {
       type: 'category',
       data: names,
       inverse: true,
       ...axis,
       splitLine: { show: false },
-      axisLabel: { color: palette.textSecondary, fontSize: 11 }
+      // 名字过长截断省略，避免撑爆条形区（首页宽卡与托盘窄面板共用）；全名看 tooltip
+      axisLabel: { color: palette.textSecondary, fontSize: 11, width: 96, overflow: 'truncate' }
     },
     series: [
       {
