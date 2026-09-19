@@ -15,6 +15,8 @@ export function listProviders(): ProviderInfo[] {
       kind: providers.kind,
       baseUrl: providers.baseUrl,
       apiKey: providers.apiKey,
+      quotaStrategyId: providers.quotaStrategyId,
+      strategyConfig: providers.strategyConfig,
       enabled: providers.enabled,
       archivedAt: providers.archivedAt,
       createdAt: providers.createdAt,
@@ -39,6 +41,8 @@ export function createProvider(input: ProviderInput): string {
       kind: input.kind ?? null,
       baseUrl: input.baseUrl,
       apiKey: input.apiKey,
+      quotaStrategyId: input.quotaStrategyId ?? null,
+      strategyConfig: input.strategyConfig ?? null,
       enabled: input.enabled,
       createdAt: now,
       updatedAt: now
@@ -76,6 +80,9 @@ export function updateProvider(input: ProviderInput): void {
         kind: input.kind ?? null,
         baseUrl: input.baseUrl,
         apiKey: input.apiKey,
+        // 显式写入（含 null）：支持「解除余量策略绑定」的清除
+        quotaStrategyId: input.quotaStrategyId ?? null,
+        strategyConfig: input.strategyConfig ?? null,
         enabled: input.enabled,
         updatedAt: Date.now()
       })

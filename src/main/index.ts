@@ -5,6 +5,7 @@ import { createMainWindow, showMainWindow } from '$/app/mainWindow'
 import { registerAppTray } from '$/app/tray'
 import { initDb } from '$/db/client'
 import { cleanupLogsOnStartup } from '$/ipc/logIpc'
+import { startQuotaScheduler } from '$/quota/scheduler'
 import { registerIpc } from '$/registerIpc'
 import { ensureServiceDefaults } from '$/db/repo/settingRepo'
 import { startProxyServer, stopProxyServer } from '$/server'
@@ -36,6 +37,9 @@ if (hasSingleInstanceLock) {
 
     // 启动本地代理服务（未启用时仅更新状态）
     await startProxyServer()
+
+    // 余量查询：注册策略 + 定时刷新（绑定了余量策略的提供商）
+    startQuotaScheduler()
 
     // 注册系统托盘（macOS 标题实时显示今日用量）
     registerAppTray()

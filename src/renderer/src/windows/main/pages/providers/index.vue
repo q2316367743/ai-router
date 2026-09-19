@@ -142,6 +142,8 @@ async function toggleEnabled(row: ProviderInfo, enabled: boolean): Promise<void>
       kind: row.kind,
       baseUrl: row.baseUrl,
       apiKey: row.apiKey,
+      quotaStrategyId: row.quotaStrategyId,
+      strategyConfig: row.strategyConfig,
       enabled
     })
     row.enabled = enabled

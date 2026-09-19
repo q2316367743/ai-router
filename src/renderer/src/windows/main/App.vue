@@ -60,6 +60,7 @@ const menus: MenuItem[] = [
   { value: '/service', label: '服务', icon: 'server' },
   { value: '/logs', label: '日志', icon: 'history' },
   { value: '/usage', label: '用量统计', icon: 'chart-bar' },
+  { value: '/quota', label: '余量', icon: 'data-base' },
   { value: '/settings', label: '设置', icon: 'setting' }
 ]
 

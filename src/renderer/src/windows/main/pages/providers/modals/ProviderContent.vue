@@ -68,6 +68,41 @@
         <span class="text-12px text-td-secondary">{{ PROTOCOL_HINTS[form.protocol].help }}</span>
       </template>
     </t-form-item>
+    <t-form-item label="余量策略">
+      <t-select
+        v-model="form.quotaStrategyId"
+        clearable
+        filterable
+        placeholder="不查询余量"
+        :loading="strategyLoading"
+      >
+        <t-option
+          v-for="opt in strategyOptions"
+          :key="opt.id"
+          :value="opt.id"
+          :label="opt.builtin ? `${opt.label}（内置）` : `${opt.label}（外置）`"
+        />
+      </t-select>
+      <template #help>
+        <span class="text-12px text-td-secondary">{{ strategyHelp }}</span>
+      </template>
+    </t-form-item>
+    <t-form-item v-if="needStrategyConfig" label="附加配置（JSON）">
+      <t-textarea
+        v-model="form.strategyConfig"
+        :autosize="{ minRows: 3, maxRows: 6 }"
+        :placeholder="configPlaceholder"
+      />
+      <template #help>
+        <span class="text-12px text-td-secondary">
+          {{
+            credential === 'cookie'
+              ? '粘贴浏览器 Cookie 头，如 {"cookie":"session=..."}'
+              : '如 {"token":"..."}（Codex 令牌、区域等附加配置）'
+          }}
+        </span>
+      </template>
+    </t-form-item>
     <t-form-item label="启用">
       <t-switch v-model="form.enabled" />
     </t-form-item>
@@ -75,7 +110,7 @@
 </template>
 
 <script lang="ts" setup>
-import type { ProviderInfo, ProviderKind, ProviderProtocol } from '@common/types'
+import type { ProviderInfo, ProviderKind, ProviderProtocol, QuotaStrategyInfo } from '@common/types'
 import { MessageUtil } from '@/utils/modal'
 import { PROVIDER_PRESETS, getPreset } from '../presets'
 
@@ -119,8 +154,68 @@ const form = reactive({
   protocol: (props.provider?.protocol ?? 'openai') as ProviderProtocol,
   baseUrl: props.provider?.baseUrl ?? '',
   apiKey: props.provider?.apiKey ?? '',
+  /** 空串 = 未绑定（t-select 不接受 null）；提交时转 null 落库 */
+  quotaStrategyId: props.provider?.quotaStrategyId ?? '',
+  strategyConfig: props.provider?.strategyConfig ?? '',
   enabled: props.provider?.enabled ?? true
 })
+
+/** 余量策略目录（内置 + 已启用外置）：编辑已有提供商与新增时都会加载 */
+const strategyOptions = ref<QuotaStrategyInfo[]>([])
+const strategyLoading = ref(false)
+
+onMounted(async () => {
+  strategyLoading.value = true
+  try {
+    strategyOptions.value = await window.preload.quota.strategies()
+    // 编辑已有提供商时，若其绑定的外置策略已被禁用（不在目录），补一个占位项避免显示丢值
+    const bound = form.quotaStrategyId
+    if (bound && !strategyOptions.value.some((s) => s.id === bound)) {
+      strategyOptions.value = [
+        ...strategyOptions.value,
+        {
+          id: bound,
+          label: '（已停用的外置策略）',
+          builtin: false,
+          credential: 'apiKey',
+          enabled: false
+        }
+      ]
+    }
+  } catch {
+    // 目录加载失败不阻塞表单（余量策略为可选功能）
+  } finally {
+    strategyLoading.value = false
+  }
+})
+
+const selectedStrategy = computed(
+  () => strategyOptions.value.find((s) => s.id === form.quotaStrategyId) ?? null
+)
+
+const credential = computed(() => selectedStrategy.value?.credential ?? 'apiKey')
+
+/** 非 API Key 凭证策略需要附加配置（Cookie / 令牌） */
+const needStrategyConfig = computed(
+  () =>
+    selectedStrategy.value !== null && credential.value !== 'apiKey' && credential.value !== 'none'
+)
+
+const configPlaceholder = computed(() =>
+  credential.value === 'cookie' ? '{"cookie":"session=..."}' : '{"token":"..."}'
+)
+
+const strategyHelp = computed(() => {
+  const strategy = selectedStrategy.value
+  if (!strategy) return '绑定后在「余量」页展示该提供商的限额窗口；内置策略按预设自动推荐'
+  return strategy.description ?? ''
+})
+
+/** 点选预设：同名内置策略存在时自动绑定（如 Z.ai → zai 策略） */
+function autoBindStrategy(kind: ProviderKind | ''): void {
+  if (!kind) return
+  if (strategyOptions.value.some((s) => s.id === kind)) form.quotaStrategyId = kind
+}
 
 const currentPreset = computed(() => getPreset(form.kind || null))
 
@@ -147,6 +242,7 @@ function selectKind(value: ProviderKind | ''): void {
     form.name = preset.label
     autoName = preset.label
   }
+  autoBindStrategy(form.kind)
 }
 
 /** 已选预设时切换协议：该协议有官方端点则同步换 Base URL，没有则保留手填值 */
@@ -180,6 +276,11 @@ async function submit(): Promise<void> {
       kind: form.kind || null,
       baseUrl: form.baseUrl.trim(),
       apiKey: form.apiKey.trim(),
+      quotaStrategyId: form.quotaStrategyId || null,
+      strategyConfig:
+        form.quotaStrategyId && needStrategyConfig.value && form.strategyConfig.trim()
+          ? form.strategyConfig.trim()
+          : null,
       enabled: form.enabled
     }
     if (props.provider) {

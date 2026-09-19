@@ -37,6 +37,11 @@ export const routes: Array<RouteRecordRaw> = [
     component: () => import('@/windows/main/pages/usage/index.vue')
   },
   {
+    name: '余量',
+    path: '/quota',
+    component: () => import('@/windows/main/pages/quota/index.vue')
+  },
+  {
     name: '设置',
     path: '/settings',
     component: () => import('@/windows/main/pages/settings/index.vue')

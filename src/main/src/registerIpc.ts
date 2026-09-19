@@ -3,6 +3,7 @@ import { registerAppIpc } from '$/ipc/appIpc'
 import { registerLogIpc } from '$/ipc/logIpc'
 import { registerModelIpc } from '$/ipc/modelIpc'
 import { registerProviderIpc } from '$/ipc/providerIpc'
+import { registerQuotaIpc } from '$/ipc/quotaIpc'
 import { registerServiceIpc } from '$/ipc/serviceIpc'
 import { registerTrayIpc } from '$/ipc/trayIpc'
 import { registerUsageIpc } from '$/ipc/usageIpc'
@@ -19,5 +20,6 @@ export function registerIpc(): void {
   registerServiceIpc()
   registerLogIpc()
   registerUsageIpc()
+  registerQuotaIpc()
   registerTrayIpc()
 }

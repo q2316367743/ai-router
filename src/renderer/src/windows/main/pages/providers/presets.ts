@@ -34,6 +34,12 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     urls: { openai: 'https://api.deepseek.com' }
   },
   {
+    kind: 'openai',
+    label: 'OpenAI',
+    consoleUrl: 'https://platform.openai.com/api-keys',
+    urls: { openai: 'https://api.openai.com/v1' }
+  },
+  {
     kind: 'siliconflow',
     label: 'SiliconFlow',
     consoleUrl: 'https://cloud.siliconflow.cn/account/ak',

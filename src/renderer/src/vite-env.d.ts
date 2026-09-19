@@ -9,6 +9,10 @@ import type {
   ModelMappingInput,
   ProviderInfo,
   ProviderInput,
+  ProviderQuotaInfo,
+  QuotaPluginInfo,
+  QuotaPluginInput,
+  QuotaStrategyInfo,
   RequestLogDetail,
   ServiceConfig,
   ServiceStatus,
@@ -88,6 +92,24 @@ declare global {
         modelSpeed(): Promise<UsageModelSpeed>
         /** 来源客户端请求数：固定近七天窗口，按来源分组计数（数据源为请求日志） */
         clientStats(): Promise<UsageClientStats>
+      }
+      quota: {
+        /** 余量页列表：绑定了余量策略的提供商 + 最新快照（读库，不出站） */
+        list(): Promise<ProviderQuotaInfo[]>
+        /** 手动刷新（不传 id 刷全部），返回刷新后的列表 */
+        refresh(providerId?: string): Promise<ProviderQuotaInfo[]>
+        /** 策略目录：内置（只读，不可卸载）+ 外置（含启停状态） */
+        strategies(): Promise<QuotaStrategyInfo[]>
+      }
+      quotaPlugin: {
+        /** 外置策略全量列表（含已归档，UI 自行过滤） */
+        list(): Promise<QuotaPluginInfo[]>
+        /** 安装脚本策略（main 侧先 eval 校验），返回新 id */
+        create(input: QuotaPluginInput): Promise<string>
+        /** 编辑脚本策略（归档行不可编辑），更新后自动重载注册表 */
+        update(input: QuotaPluginInput): Promise<void>
+        /** 归档（假删除）：连带解绑引用它的提供商 */
+        archive(id: string): Promise<void>
       }
       tray: {
         /** 收起托盘统计面板 */

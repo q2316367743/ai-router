@@ -43,6 +43,13 @@
       "when": 1789815261229,
       "tag": "0005_certain_amazoness",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1789823628341,
+      "tag": "0006_easy_edwin_jarvis",
+      "breakpoints": true
     }
   ]
 }

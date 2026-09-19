@@ -8,6 +8,8 @@ import { serviceApi } from '~/modules/service/service'
 import { logApi } from '~/modules/log/log'
 import { trayApi } from '~/modules/tray/tray'
 import { usageApi } from '~/modules/usage/usage'
+import { quotaApi } from '~/modules/quota/quota'
+import { quotaPluginApi } from '~/modules/quotaPlugin/quotaPlugin'
 
 // 各域 API 在 src/preload/src/modules/<域>/ 实现，在此组装暴露给渲染层（window.preload）。
 // 契约类型同步声明在 src/renderer/src/vite-env.d.ts 的 Window.preload。
@@ -19,6 +21,8 @@ const preload = {
   service: serviceApi,
   log: logApi,
   usage: usageApi,
+  quota: quotaApi,
+  quotaPlugin: quotaPluginApi,
   tray: trayApi
 }
 
