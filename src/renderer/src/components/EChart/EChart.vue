@@ -7,7 +7,7 @@
  * echarts 容器：负责 init / setOption / resize / dispose 与主题响应重绘。
  * 业务侧只传 option；palette 变化（深浅色切换）时自动重新 setOption 以应用新色值。
  */
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { echarts, type EChartsOption } from './echarts'
 
 const props = defineProps<{
@@ -34,6 +34,9 @@ onMounted(() => {
 })
 
 watch(() => props.option, render, { deep: true })
+
+// keep-alive 页面切回来时容器刚重新插入 DOM，补一次测量（ResizeObserver 不保证此时回调）
+onActivated(() => chart?.resize())
 
 onBeforeUnmount(() => {
   observer?.disconnect()

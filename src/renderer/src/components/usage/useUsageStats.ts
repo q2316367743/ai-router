@@ -123,7 +123,8 @@ export interface UseUsageStatsResult {
   cacheTokens: ComputedRef<number>
   /** 令牌构成四段（无数据的分段不返回） */
   composition: ComputedRef<CompositionSegment[]>
-  refresh(): Promise<void>
+  /** 取一次数据（含筛选项）；`silent` 供节拍刷新使用：不显示加载态，避免停留期间反复闪遮罩 */
+  refresh(options?: { silent?: boolean }): Promise<void>
 }
 
 export function useUsageStats(initialRange: UsageRangeKey = 'last24h'): UseUsageStatsResult {
@@ -173,8 +174,8 @@ export function useUsageStats(initialRange: UsageRangeKey = 'last24h'): UseUsage
     }))
   })
 
-  async function refresh(): Promise<void> {
-    loading.value = true
+  async function refresh(silent = false): Promise<void> {
+    if (!silent) loading.value = true
     try {
       const query: UsageQuery = {
         range: range.value,
@@ -183,7 +184,7 @@ export function useUsageStats(initialRange: UsageRangeKey = 'last24h'): UseUsage
       }
       overview.value = await window.preload.usage.overview(query)
     } finally {
-      loading.value = false
+      if (!silent) loading.value = false
     }
   }
 
@@ -208,8 +209,8 @@ export function useUsageStats(initialRange: UsageRangeKey = 'last24h'): UseUsage
     cacheRatio,
     cacheTokens,
     composition,
-    refresh: async () => {
-      await Promise.all([refresh(), loadFilters()])
+    refresh: async (options?: { silent?: boolean }) => {
+      await Promise.all([refresh(options?.silent ?? false), loadFilters()])
     }
   }
 }

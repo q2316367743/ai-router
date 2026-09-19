@@ -22,7 +22,13 @@
 
     <!-- 内容区：浮于页面背景之上的圆角卡片（Fluent Design 层级） -->
     <t-content class="main-container">
-      <router-view />
+      <!-- 只缓存概览页：它是唯一「进页就重建整套图表」的重页面，缓存后切回来不复用空态、直接显示上次数据；
+           日志页的推送订阅与轮询依赖卸载收尾，不缓存 -->
+      <router-view v-slot="{ Component }">
+        <keep-alive :include="['HomePage']">
+          <component :is="Component" />
+        </keep-alive>
+      </router-view>
     </t-content>
 
     <!-- 折叠按钮：悬浮于标题区左侧（macOS 让出交通灯），穿透拖拽层 -->

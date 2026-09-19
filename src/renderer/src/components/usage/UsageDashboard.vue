@@ -81,11 +81,11 @@
           :height="providerHeight"
         />
 
-        <!-- 来源 Agent 请求数（固定近七天窗口，独立于上方的维度切换与筛选） -->
-        <UsageClientCard v-if="showClients" />
+        <!-- 来源 Agent 请求数（固定近七天窗口，独立于上方的维度切换与筛选；数据由父组件按节拍统一取） -->
+        <UsageClientCard v-if="showClients" :data="clients" />
 
-        <!-- 模型速度折线（固定近七天窗口，独立于上方的维度切换与筛选） -->
-        <UsageSpeedCard v-if="showSpeed" />
+        <!-- 模型速度折线（同上） -->
+        <UsageSpeedCard v-if="showSpeed" :data="speed" />
       </div>
     </t-loading>
   </div>
@@ -101,7 +101,7 @@
  * - showSpeed 单独开关：模型速度折线的数据源与窗口都独立于维度切换，托盘窄面板也不放下多线图。
  */
 import { computed } from 'vue'
-import type { UsageRangeKey } from '@common/types'
+import type { UsageClientStats, UsageModelSpeed, UsageRangeKey } from '@common/types'
 import type { UseUsageStatsResult } from './useUsageStats'
 import UsageStatCard from './UsageStatCard.vue'
 import UsageChartCard from './UsageChartCard.vue'
@@ -121,6 +121,10 @@ import { useChartPalette } from '@/components/EChart/tokens'
 const props = withDefaults(
   defineProps<{
     stats: UseUsageStatsResult
+    /** 模型速度折线数据（固定近七天窗口，由父组件按刷新节拍统一取数；托盘面板不展示） */
+    speed?: UsageModelSpeed | null
+    /** 来源 Agent 请求数数据（同上） */
+    clients?: UsageClientStats | null
     /** 统计维度候选（两端一致：今天 / 近24小时 / 近七天 / 近30天） */
     ranges?: UsageRangeKey[]
     /** 是否展示供应商 / 模型筛选 */
@@ -133,6 +137,8 @@ const props = withDefaults(
     compact?: boolean
   }>(),
   {
+    speed: null,
+    clients: null,
     ranges: () => ['today', 'last24h', 'last7d', 'last30d'],
     showFilters: true,
     showSpeed: false,

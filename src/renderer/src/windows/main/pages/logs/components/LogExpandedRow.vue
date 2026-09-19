@@ -50,6 +50,14 @@
           }}</t-descriptions-item>
         </t-descriptions>
 
+        <!-- 正文已超保留期：行、标头与统计信息仍在，只有正文被 main 侧按窗口清空 -->
+        <t-alert
+          v-if="bodyExpired"
+          theme="info"
+          style="margin-top: 16px"
+          :message="`请求 / 响应正文仅保留最近 ${LOG_BODY_RETENTION_HOURS} 小时，更早的记录只剩标头与统计信息`"
+        />
+
         <div class="grid grid-cols-2 gap-16px mt-16px">
           <LogPayloadPanel
             title="请求"
@@ -76,8 +84,9 @@
 </template>
 
 <script lang="ts" setup>
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import type { RequestLogDetail } from '@common/types'
+import { LOG_BODY_RETENTION_HOURS } from '@common/constants'
 import { formatDuration, formatTokens, isPendingStatus, isSuccessStatus } from '@/utils/format'
 import LogPayloadPanel from './LogPayloadPanel.vue'
 import CodeViewer from './CodeViewer.vue'
@@ -90,6 +99,18 @@ const props = defineProps<{
 
 const loading = ref(true)
 const log = ref<RequestLogDetail | null>(null)
+
+/**
+ * 正文已超保留期：已结束且两侧正文全空 —— 正文在结束阶段就已回填，正常请求不会为空；
+ * 未结束的行正文在 pending 阶段就落库，故排除 finishedAt 为 null 的行。
+ */
+const bodyExpired = computed(
+  () =>
+    !!log.value &&
+    log.value.finishedAt !== null &&
+    !log.value.requestBody &&
+    !log.value.responseBody
+)
 
 async function reload(): Promise<void> {
   loading.value = true

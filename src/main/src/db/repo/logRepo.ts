@@ -1,4 +1,4 @@
-import { and, between, eq, gt, isNotNull, isNull, lt, or, sql } from 'drizzle-orm'
+import { and, between, eq, gt, inArray, isNotNull, isNull, lt, or, sql } from 'drizzle-orm'
 import type {
   LogFilterOptions,
   LogListQuery,
@@ -6,13 +6,18 @@ import type {
   RequestLogDetail,
   TodayStats
 } from '@common/types'
+import { LOG_BODY_RETENTION_HOURS } from '@common/constants'
 import { db } from '../client'
 import { requestLogs } from '../schema'
-import { dateKey, todayKey } from '../../utils/date'
+import { dateKey, todayKey } from '$/utils/date'
 import type { HistoryRef } from './renameRepo'
 
-/** 保留窗口：最近 7 天（含当天） */
+/** 行保留窗口：最近 7 天（含当天） */
 const RETENTION_DAYS = 7
+/** 正文清扫单批行数：每批一条语句，批间让出事件循环 */
+const BODY_SWEEP_BATCH = 200
+/** 正文清扫的批间停顿（ms）：清扫没有时限，要慢慢跑完，不跟代理请求抢主进程 */
+const BODY_SWEEP_PAUSE_MS = 50
 
 export type RequestLogEntry = Omit<RequestLogDetail, 'id' | 'logDate'> & HistoryRef
 /** pending 行入参：结束阶段才可知的字段全部缺省（由 recordLog 回填） */
@@ -77,6 +82,10 @@ const listColumns = {
 
 /** 最近一次执行过期清理的日期键：把「每请求一次 DELETE」降为「每天一次」 */
 let lastCleanupDate: string | null = null
+/** 正文清扫游标（按 id 递增推进）：本进程内有效，重启后从最小 id 重新走一遍 */
+let bodySweepCursor = 0
+/** 清扫进行中标记：避免同一次清扫并发跑两遍 */
+let bodySweeping = false
 
 /**
  * 落一条 pending 日志（请求进入转发前调用）：只写请求侧已知字段，
@@ -133,6 +142,61 @@ export function cleanupExpiredLogs(): void {
   lastCleanupDate = today
   const boundary = dateKey(Date.now() - (RETENTION_DAYS - 1) * 24 * 60 * 60 * 1000)
   db().delete(requestLogs).where(lt(requestLogs.logDate, boundary)).run()
+  void sweepExpiredBodies()
+}
+
+/**
+ * 清空超出正文保留窗口（LOG_BODY_RETENTION_HOURS 小时）的请求 / 响应正文，行本身照旧保留 7 天。
+ *
+ * 正文是日志体积的绝对大头（流式响应会把整段 SSE 文本落库），只留最近这段时间、其余置空，
+ * 日志表才撑得住 7 天保留期；列表、筛选项、模型速度折线与来源统计只读元数据列，不受影响。
+ * 标头不清：KB 级体积，排查时仍有用。
+ *
+ * 按 id 递增分批推进（id 自增即时间序，到达边界后最后一批自然清空退出）：首次启用要清掉
+ * 此前积累的多天正文，分批 + 批间停顿只会表现为后台慢慢跑，不会一次 UPDATE 卡住主进程。
+ */
+async function sweepExpiredBodies(): Promise<void> {
+  if (bodySweeping) return
+  bodySweeping = true
+  const startedAtLimit = Date.now() - LOG_BODY_RETENTION_HOURS * 60 * 60 * 1000
+  try {
+    for (;;) {
+      const rows = db()
+        .select({ id: requestLogs.id })
+        .from(requestLogs)
+        .where(
+          and(
+            gt(requestLogs.id, bodySweepCursor),
+            lt(requestLogs.startedAt, startedAtLimit),
+            or(isNotNull(requestLogs.requestBody), isNotNull(requestLogs.responseBody))
+          )
+        )
+        .orderBy(requestLogs.id)
+        .limit(BODY_SWEEP_BATCH)
+        .all()
+      const last = rows[rows.length - 1]
+      if (!last) return
+      db()
+        .update(requestLogs)
+        .set({ requestBody: null, responseBody: null })
+        .where(
+          inArray(
+            requestLogs.id,
+            rows.map((row) => row.id)
+          )
+        )
+        .run()
+      bodySweepCursor = last.id
+      await pause(BODY_SWEEP_PAUSE_MS)
+    }
+  } finally {
+    bodySweeping = false
+  }
+}
+
+/** 批次间的停顿：让 IPC 与代理请求先跑（用 setTimeout 而非 setImmediate，避免长时间占满主进程） */
+function pause(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 /**
