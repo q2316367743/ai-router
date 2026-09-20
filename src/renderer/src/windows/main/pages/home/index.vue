@@ -18,7 +18,13 @@
         >
       </ServiceStatusBar>
 
-      <UsageDashboard :stats="stats" :speed="speed" :clients="clients" surface="home" />
+      <UsageDashboard
+        :stats="stats"
+        :speed="speed"
+        :clients="clients"
+        :agent-flow="agentFlow"
+        surface="home"
+      />
     </div>
   </PageLayout>
 </template>
@@ -38,7 +44,7 @@
  */
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import type { UsageClientStats, UsageModelSpeed } from '@common/types'
+import type { UsageAgentFlow, UsageClientStats, UsageModelSpeed } from '@common/types'
 import PageLayout from '@/components/PageLayout/PageLayout.vue'
 import ServiceStatusBar from '@/components/service/ServiceStatusBar.vue'
 import UsageDashboard from '@/components/usage/UsageDashboard.vue'
@@ -58,9 +64,10 @@ const router = useRouter()
 
 const status = useServiceStatus()
 const stats = useUsageStats('last24h')
-/** 固定近七天窗口的两张图：数据源是请求日志（含来源与速度），不随看板维度与筛选变化 */
+/** 固定近七天窗口的三张图：数据源是请求日志（含来源、流向与速度），不随看板维度与筛选变化 */
 const speed = ref<UsageModelSpeed | null>(null)
 const clients = ref<UsageClientStats | null>(null)
+const agentFlow = ref<UsageAgentFlow | null>(null)
 
 /** 首次进入显示加载态，之后的节拍刷新静默（否则停留期间每 30 秒闪一次遮罩） */
 let loaded = false
@@ -74,6 +81,9 @@ async function refreshAll(): Promise<void> {
     }),
     window.preload.usage.clientStats().then((next) => {
       clients.value = next
+    }),
+    window.preload.usage.agentFlow().then((next) => {
+      agentFlow.value = next
     })
   ])
   loaded = true

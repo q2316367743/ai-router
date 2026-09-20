@@ -20,6 +20,10 @@ export interface ChartPalette {
   error: string
   /** 供应商 / 构成分线循环色（取自 tdesign brand 色阶，保证深浅色下都可辨） */
   series: string[]
+  /** 日历热力图色阶（由浅到深，visualMap inRange 取色） */
+  heat: string[]
+  /** 日历热力图空格子底色（当日无请求） */
+  heatEmpty: string
 }
 
 function readVar(name: string, fallback: string): string {
@@ -47,7 +51,15 @@ function readPalette(): ChartPalette {
       readVar('--td-success-color-3', '#7fd4a8'),
       readVar('--td-warning-color-3', '#f0b268'),
       readVar('--td-brand-color-9', '#005a9e')
-    ]
+    ],
+    heat: [
+      readVar('--td-brand-color-1', '#e3f2fd'),
+      readVar('--td-brand-color-3', '#90caf9'),
+      readVar('--td-brand-color-5', '#4da3ea'),
+      readVar('--td-brand-color-7', '#0078d4'),
+      readVar('--td-brand-color-9', '#005a9e')
+    ],
+    heatEmpty: readVar('--td-bg-color-component', '#f3f3f3')
   }
 }
 

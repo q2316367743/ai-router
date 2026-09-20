@@ -17,6 +17,7 @@ import type {
   ServiceConfig,
   ServiceStatus,
   TodayStats,
+  UsageAgentFlow,
   UsageClientStats,
   UsageDailyItem,
   UsageFilterOptions,
@@ -100,6 +101,8 @@ declare global {
         modelSpeed(): Promise<UsageModelSpeed>
         /** 来源客户端请求数：固定近七天窗口，按来源分组计数（数据源为请求日志） */
         clientStats(): Promise<UsageClientStats>
+        /** Agent × 提供商交叉流量：固定近七天窗口，按来源 × 提供商分组计数（数据源为请求日志） */
+        agentFlow(): Promise<UsageAgentFlow>
       }
       quota: {
         /** 余量页列表：绑定了余量策略的提供商 + 最新快照（读库，不出站） */
