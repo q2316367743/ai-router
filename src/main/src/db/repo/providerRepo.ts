@@ -22,7 +22,7 @@ export function listProviders(): ProviderInfo[] {
       createdAt: providers.createdAt,
       updatedAt: providers.updatedAt,
       // 可用模型数：不含已归档映射（归档即对外不存在）
-      modelCount: sql<number>`(select count(*) from ${models} where ${models.providerId} = ${providers.id} and ${models.archivedAt} is null)`
+      modelCount: sql<number>`(select count(*) from ${models} where ${models.providerId} = ${sql.raw('"providers"."id"')} and ${models.archivedAt} is null)`
     })
     .from(providers)
     .orderBy(providers.createdAt)

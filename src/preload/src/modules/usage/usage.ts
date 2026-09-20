@@ -1,5 +1,6 @@
 import { ipcRenderer } from 'electron'
 import type {
+  UsageAgentFlow,
   UsageClientStats,
   UsageDailyItem,
   UsageFilterOptions,
@@ -28,5 +29,9 @@ export const usageApi = {
   /** 来源客户端请求数：固定近七天窗口，按来源分组计数（数据源为请求日志） */
   clientStats(): Promise<UsageClientStats> {
     return ipcRenderer.invoke('usage:clientStats')
+  },
+  /** Agent × 提供商交叉流量：固定近七天窗口，按来源 × 提供商分组计数（数据源为请求日志） */
+  agentFlow(): Promise<UsageAgentFlow> {
+    return ipcRenderer.invoke('usage:agentFlow')
   }
 }

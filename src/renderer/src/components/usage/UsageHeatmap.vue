@@ -1,237 +1,35 @@
 <template>
-  <div class="heat-wrap">
-    <!-- 月份标签行：与热力矩阵同一 flex 结构（左侧占位 + 每周一个槽位），标签落在月份切换的列上 -->
-    <div v-if="weeks.length > 0" class="month-row">
-      <span class="month-spacer"></span>
-      <span v-for="(label, wi) in monthLabels" :key="wi" class="month-slot">{{ label }}</span>
-    </div>
-
-    <!-- 热力矩阵：列为周，行为星期（GitHub 提交图排布）；列宽自适应铺满卡片 -->
-    <div class="heat-grid">
-      <div class="weekday-column">
-        <span v-for="(label, i) in weekdayLabels" :key="i" class="weekday-label">{{ label }}</span>
-      </div>
-      <t-tooltip v-for="(week, wi) in weeks" :key="wi" :disabled="week.lines.length === 0">
-        <div class="week-column">
-          <span
-            v-for="(cell, ci) in week.cells"
-            :key="cell?.date ?? `pad-${ci}`"
-            class="heat-cell"
-            :style="{ background: cell?.color ?? 'transparent' }"
-          ></span>
-        </div>
-        <template #content>
-          <div v-for="line in week.lines" :key="line" class="text-11px">{{ line }}</div>
-        </template>
-      </t-tooltip>
-    </div>
-
-    <div class="flex items-center justify-end gap-4px mt-10px">
-      <span class="text-11px text-td-placeholder">少</span>
-      <span
-        v-for="(color, i) in legendColors"
-        :key="i"
-        class="legend-cell"
-        :style="{ background: color }"
-      ></span>
-      <span class="text-11px text-td-placeholder">多</span>
-    </div>
-  </div>
+  <EChart v-if="option" :option="option" :height="height" />
 </template>
 
 <script lang="ts" setup>
 /**
- * 活跃度热力矩阵（GitHub 提交图式排布），从 UsageActivityCard 拆出以控制单文件行数。
+ * 活跃度热力矩阵：echarts 日历热力图（列=周、行=星期、带月/日标签与 visualMap 色阶）。
  *
- * 排布：7 行（周日→周六）× N 列（周），首列与末列可能不满，用占位空格补齐。
- * 配色：按请求数分五档，全部取自 tdesign token（无裸色值），深浅色自动跟随。
- *
- * 这里的档位是「热度」分档（把请求数映射到 5 级色阶），与 useUsageStats 的好坏/量级档
- * 是两回事，故阈值留在本组件内。
+ * 排布与 tooltip 由 `buildCalendarHeatmapOption` 纯函数构造；本组件只负责取 palette、
+ * 按 compact 决定格子高度与整图高度。数据窗口（首页整年 / 托盘 12 周）由父组件切片后传入。
  */
 import { computed } from 'vue'
 import type { UsageActivity } from '@common/types'
-import { formatTokens } from '@/utils/format'
+import type { EChartsOption } from '@/components/EChart/echarts'
+import EChart from '@/components/EChart/EChart.vue'
+import { buildCalendarHeatmapOption } from '@/components/EChart/optionsFlow'
+import { useChartPalette } from '@/components/EChart/tokens'
 
-const props = defineProps<{ activity: UsageActivity }>()
+const props = withDefaults(
+  defineProps<{
+    activity: UsageActivity
+    /** 紧凑模式（托盘窄面板）：压矮格子与整图 */
+    compact?: boolean
+  }>(),
+  { compact: false }
+)
 
-const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六']
-/** 日历首日：与 GitHub 一致从周日起排 */
-const WEEK_START = 0
-const DAYS_PER_WEEK = 7
-/** 热度分档阈值（按请求数）：1-2 / 3-5 / 6-10 / 11+ */
-const LEVEL_THRESHOLDS = [3, 6, 11]
+const palette = useChartPalette()
 
-interface HeatCell {
-  date: string
-  color: string
-  level: number
-}
+const option = computed<EChartsOption | null>(() =>
+  buildCalendarHeatmapOption(palette.value, props.activity, props.compact ? 10 : 12)
+)
 
-interface HeatWeek {
-  cells: Array<HeatCell | null>
-  /** 该周逐日明细（tooltip 逐行展示），空数组表示该周无数据 */
-  lines: string[]
-}
-
-const weekdayLabels = computed(() => {
-  const ordered: string[] = []
-  for (let i = 0; i < DAYS_PER_WEEK; i += 1) {
-    ordered.push(WEEKDAY_LABELS[(WEEK_START + i) % DAYS_PER_WEEK] as string)
-  }
-  return ordered
-})
-
-/**
- * 月份标签（每周一格，无标签为空串）：月份在某一列首次出现时标注「N月」。
- * 相邻标签至少隔 3 列，窗口放不下时跳过（与 GitHub 提交图行为一致）。
- */
-const monthLabels = computed<string[]>(() => {
-  const labels = weeks.value.map(() => '')
-  let lastMonth = -1
-  let lastLabelColumn = -3
-  weeks.value.forEach((week, i) => {
-    const first = week.cells.find((cell) => cell !== null)
-    if (!first) return
-    const month = Number(first.date.slice(5, 7))
-    if (month !== lastMonth && i - lastLabelColumn >= 3) {
-      labels[i] = `${month}月`
-      lastMonth = month
-      lastLabelColumn = i
-    }
-  })
-  return labels
-})
-
-/** 请求数 → 热度档位（0 档为无请求的空色） */
-function levelOf(requestCount: number): number {
-  if (requestCount <= 0) return 0
-  let level = 1
-  for (const threshold of LEVEL_THRESHOLDS) {
-    if (requestCount >= threshold) level += 1
-  }
-  return level
-}
-
-const levelColors = computed(() => [
-  'var(--td-bg-color-component)',
-  'var(--td-brand-color-2)',
-  'var(--td-brand-color-4)',
-  'var(--td-brand-color-6)',
-  'var(--td-brand-color-8)'
-])
-
-const legendColors = computed(() => levelColors.value.slice(1))
-
-const weeks = computed<HeatWeek[]>(() => {
-  const cells = props.activity.cells
-  if (cells.length === 0) return []
-
-  const result: HeatWeek[] = []
-  let current: Array<HeatCell | null> = []
-  const firstWeekday = new Date(`${cells[0]?.date}T00:00:00`).getDay()
-  const leadingPad = (firstWeekday - WEEK_START + DAYS_PER_WEEK) % DAYS_PER_WEEK
-  for (let i = 0; i < leadingPad; i += 1) current.push(null)
-
-  for (const cell of cells) {
-    const level = levelOf(cell.requestCount)
-    current.push({
-      date: cell.date,
-      level,
-      color: levelColors.value[level] as string
-    })
-    if (current.length === DAYS_PER_WEEK) {
-      result.push({ cells: current, lines: weekLines(current) })
-      current = []
-    }
-  }
-  if (current.length > 0) {
-    while (current.length < DAYS_PER_WEEK) current.push(null)
-    result.push({ cells: current, lines: weekLines(current) })
-  }
-  return result
-})
-
-/** 每周 tooltip 明细：该周有数据的日子逐行列出 */
-function weekLines(cells: Array<HeatCell | null>): string[] {
-  return cells
-    .filter((cell): cell is HeatCell => cell !== null)
-    .map((cell) => {
-      const item = props.activity.cells.find((c) => c.date === cell.date)
-      const count = item?.requestCount ?? 0
-      const tokens = formatTokens(item?.totalTokens ?? 0)
-      return `${cell.date.slice(5)} · ${count} 次 · ${tokens}`
-    })
-}
+const height = computed(() => (props.compact ? 190 : 230))
 </script>
-
-<style scoped lang="less">
-/**
- * 矩阵横向铺满卡片：week-column 用 flex:1 分摊宽度并限高 40px
- * （宽卡片下格子变大更好点，窄托盘面板下自动收窄不溢出）。
- */
-.heat-grid {
-  display: flex;
-  gap: 3px;
-}
-
-/* 月份标签行与热力矩阵共用同一 flex 骨架，槽位宽度逐列对齐 */
-.month-row {
-  display: flex;
-  gap: 3px;
-  margin-bottom: 4px;
-}
-
-.month-spacer {
-  width: 10px;
-  flex-shrink: 0;
-  margin-right: 3px;
-}
-
-/* 文本超宽时向右溢出不换行：标签间距已保证 ≥3 列，不会互相压字 */
-.month-slot {
-  flex: 1;
-  max-width: 40px;
-  min-width: 0;
-  font-size: 9px;
-  line-height: 1;
-  color: var(--td-text-color-placeholder);
-  white-space: nowrap;
-}
-
-.weekday-column {
-  display: grid;
-  grid-template-rows: repeat(7, 1fr);
-  gap: 3px;
-  width: 10px;
-  flex-shrink: 0;
-  margin-right: 3px;
-}
-
-.weekday-label {
-  font-size: 9px;
-  line-height: 12px;
-  color: var(--td-text-color-placeholder);
-}
-
-.week-column {
-  display: grid;
-  grid-template-rows: repeat(7, 1fr);
-  gap: 3px;
-  flex: 1;
-  max-width: 40px;
-  min-width: 0;
-}
-
-.heat-cell {
-  width: 100%;
-  height: 12px;
-  border-radius: 2px;
-}
-
-.legend-cell {
-  width: 10px;
-  height: 10px;
-  border-radius: 2px;
-}
-</style>

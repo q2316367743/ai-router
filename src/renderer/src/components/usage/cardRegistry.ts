@@ -17,6 +17,7 @@ import UsageSuccessRatioCard from './UsageSuccessRatioCard.vue'
 import UsageCacheRatioCard from './UsageCacheRatioCard.vue'
 import UsageProviderBarCard from './UsageProviderBarCard.vue'
 import UsageClientCard from './UsageClientCard.vue'
+import UsageSankeyCard from './UsageSankeyCard.vue'
 import UsageSpeedCard from './UsageSpeedCard.vue'
 
 const BOTH_SURFACES = ['home', 'tray'] as const
@@ -130,6 +131,15 @@ export const DASHBOARD_CARDS: DashboardCardDef[] = [
     title: '来源 Agent 请求数（近七天）',
     icon: 'chart-bar',
     component: UsageClientCard,
+    surfaces: ['home'],
+    defaultVisible: true,
+    span: 'full'
+  },
+  {
+    id: 'agent-provider-flow',
+    title: 'Agent 与提供商流向（近七天）',
+    icon: 'flowchart',
+    component: UsageSankeyCard,
     surfaces: ['home'],
     defaultVisible: true,
     span: 'full'

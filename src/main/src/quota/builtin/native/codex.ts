@@ -9,7 +9,9 @@ const USAGE_URL = 'https://chatgpt.com/backend-api/wham/usage'
 /** 读取 Codex CLI 登录态（~/.codex/auth.json 的 tokens.access_token），失败返回 null */
 function readCodexCliToken(): string | null {
   try {
-    const auth = JSON.parse(readFileSync(join(homedir(), '.codex', 'auth.json'), 'utf-8')) as unknown
+    const auth = JSON.parse(
+      readFileSync(join(homedir(), '.codex', 'auth.json'), 'utf-8')
+    ) as unknown
     const tokens = recordOf(recordOf(auth)?.tokens)
     return strOf(tokens?.access_token)
   } catch {
@@ -40,18 +42,39 @@ export const codexStrategy: QuotaStrategy = {
     label: 'OpenAI Codex',
     builtin: true,
     credential: 'token',
-    description: 'ChatGPT/Codex 订阅：5 小时 / 每周限额；令牌来自 Codex CLI 登录（~/.codex/auth.json）或附加配置 token'
+    description:
+      'ChatGPT/Codex 订阅：5 小时 / 每周限额；令牌来自 Codex CLI 登录（~/.codex/auth.json）或附加配置 token',
+    settings: [
+      {
+        key: 'token',
+        title: 'Codex 访问令牌',
+        type: 'secure',
+        hint: '缺省依次使用提供商 API Key、~/.codex/auth.json 登录态'
+      },
+      { key: 'accountId', title: 'ChatGPT Account ID', hint: '团队账户需要，作为 ChatGPT-Account-Id 请求头' }
+    ]
   },
   async fetch(ctx) {
-    const token = strOf(ctx.config.token) ?? (ctx.apiKey.trim() ? ctx.apiKey.trim() : null) ?? readCodexCliToken()
-    if (!token) throw ctx.fail.missingCredential('未找到 Codex 访问令牌：请运行 codex login 或在附加配置填写 token')
+    const token =
+      strOf(ctx.config.token) ??
+      (ctx.apiKey.trim() ? ctx.apiKey.trim() : null) ??
+      readCodexCliToken()
+    if (!token)
+      throw ctx.fail.missingCredential(
+        '未找到 Codex 访问令牌：请运行 codex login 或在附加配置填写 token'
+      )
 
     const accountId = strOf(ctx.config.accountId)
     const res = await ctx.http.getJSON(USAGE_URL, {
-      headers: { Authorization: `Bearer ${token}`, ...(accountId ? { 'ChatGPT-Account-Id': accountId } : {}) }
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(accountId ? { 'ChatGPT-Account-Id': accountId } : {})
+      }
     })
     if (res.status === 401 || res.status === 403) {
-      throw ctx.fail.authenticationExpired('Codex 令牌已过期：请重新 codex login 或更新附加配置 token')
+      throw ctx.fail.authenticationExpired(
+        'Codex 令牌已过期：请重新 codex login 或更新附加配置 token'
+      )
     }
     if (res.status !== 200) throw ctx.fail.apiFailure(`HTTP ${res.status}`)
 

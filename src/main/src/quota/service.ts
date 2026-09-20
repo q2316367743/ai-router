@@ -3,6 +3,7 @@
  * 策略执行统一经 makeNativeContext（脚本策略在其 fetch 包装内再走完整脚本运行时）。
  */
 import type { ProviderQuotaInfo, QuotaStrategyInfo, QuotaStrategyMeta } from '@common/types'
+import { parseQuotaConfig } from '@common/utils/quotaConfig'
 import { listProviders } from '$/db/repo/providerRepo'
 import { listQuotaPlugins, listQuotaSnapshots, saveQuotaResult } from '$/db/repo/quotaRepo'
 import { describeError } from './runtime/failure'
@@ -15,21 +16,6 @@ import {
 } from './runtime/context'
 import { evaluatePlugin } from './runtime/evaluate'
 import { getStrategy, listStrategies, registerStrategy, unregisterStrategy } from './registry'
-
-function parseStrategyConfig(raw: string | null): Record<string, string> {
-  if (!raw?.trim()) return {}
-  try {
-    const parsed: unknown = JSON.parse(raw)
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return {}
-    const result: Record<string, string> = {}
-    for (const [key, value] of Object.entries(parsed)) {
-      if (typeof value === 'string') result[key] = value
-    }
-    return result
-  } catch {
-    return {}
-  }
-}
 
 /** 启动/变更后重载全部外置策略：先清非内置条目，再逐个 eval 注册（跳过禁用行） */
 export function reloadExternalStrategies(): void {
@@ -46,7 +32,8 @@ export function reloadExternalStrategies(): void {
         label: plugin.name,
         builtin: false,
         credential: 'apiKey',
-        description: '用户自定义脚本策略'
+        description: '用户自定义脚本策略',
+        settings: loaded.manifest.settings
       }
       registerStrategy({
         meta,
@@ -100,7 +87,7 @@ export async function refreshProviderQuota(providerId?: string): Promise<void> {
         const ctx = makeNativeContext({
           apiKey: provider.apiKey,
           baseUrl: provider.baseUrl,
-          config: parseStrategyConfig(provider.strategyConfig)
+          config: parseQuotaConfig(provider.strategyConfig)
         })
         // 整体超时兜底：脚本路径内部有 20s 超时，native 策略由这里统一保护
         const snapshot = normalizeSnapshot(

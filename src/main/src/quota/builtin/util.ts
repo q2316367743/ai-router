@@ -22,6 +22,11 @@ export function strOf(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null
 }
 
+/** 严格整数（不接受数字字符串，区别于 numOf） */
+export function intOf(value: unknown): number | null {
+  return typeof value === 'number' && Number.isInteger(value) ? value : null
+}
+
 /** 依次取候选键中第一个有值的字段 */
 export function pick(record: Record<string, unknown> | null, keys: string[]): unknown {
   if (!record) return undefined
@@ -32,9 +37,26 @@ export function pick(record: Record<string, unknown> | null, keys: string[]): un
   return undefined
 }
 
-const PERCENT_KEYS = ['usagePercent', 'usedPercent', 'percentUsed', 'percent', 'usage_percent', 'used_percent', 'utilization']
+const PERCENT_KEYS = [
+  'usagePercent',
+  'usedPercent',
+  'percentUsed',
+  'percent',
+  'usage_percent',
+  'used_percent',
+  'utilization'
+]
 const USED_KEYS = ['used', 'usage', 'consumed', 'count', 'usedTokens', 'requestsUsed']
-const LIMIT_KEYS = ['limit', 'total', 'quota', 'max', 'cap', 'tokenLimit', 'request_limit', 'hard_limit']
+const LIMIT_KEYS = [
+  'limit',
+  'total',
+  'quota',
+  'max',
+  'cap',
+  'tokenLimit',
+  'request_limit',
+  'hard_limit'
+]
 const RESET_IN_KEYS = ['resetInSec', 'resetInSeconds', 'resetSeconds', 'reset_in_sec', 'resetSec']
 const RESET_AT_KEYS = ['resetAt', 'resetsAt', 'reset_at', 'resets_at', 'nextReset', 'next_reset']
 
@@ -49,7 +71,10 @@ export function percentOf(record: Record<string, unknown> | null): number | null
 }
 
 /** 重置时刻（epoch ms）：resetInSec 倒计时或 resetAt 时间戳（秒/毫秒自适配） */
-export function resetsAtOf(record: Record<string, unknown> | null, now = Date.now()): number | null {
+export function resetsAtOf(
+  record: Record<string, unknown> | null,
+  now = Date.now()
+): number | null {
   const inSec = numOf(pick(record, RESET_IN_KEYS))
   if (inSec !== null && inSec >= 0) return now + inSec * 1000
   const at = numOf(pick(record, RESET_AT_KEYS))

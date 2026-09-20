@@ -22,6 +22,12 @@ export interface PluginSetting {
   key: string
   title: string
   type: 'secure' | 'plain'
+  /** 表单控件（宿主 UI 用）：缺省 input（secure 缺省密码框） */
+  widget?: 'input' | 'textarea' | 'select'
+  /** widget=select 的选项 */
+  options?: Array<{ label: string; value: string }>
+  placeholder?: string
+  hint?: string
 }
 
 export interface PluginEndpointSetting {
@@ -53,11 +59,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function asStringArray(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string')
+    : []
 }
 
 /** 解析端点声明的 origin：字符串端点必须为合法 URL；setting 型记录键与访问策略 */
-function parseEndpoints(raw: unknown): { staticOrigins: string[]; settingOrigins: PluginEndpointSetting[] } {
+function parseEndpoints(raw: unknown): {
+  staticOrigins: string[]
+  settingOrigins: PluginEndpointSetting[]
+} {
   const staticOrigins: string[] = []
   const settingOrigins: PluginEndpointSetting[] = []
   for (const item of Array.isArray(raw) ? raw : []) {
@@ -68,16 +79,53 @@ function parseEndpoints(raw: unknown): { staticOrigins: string[]; settingOrigins
         // 非法端点字符串直接忽略：加载可用性优先，运行时白名单少一条而已
       }
     } else if (isRecord(item) && typeof item.setting === 'string') {
-      settingOrigins.push({ key: item.setting, policy: typeof item.policy === 'string' ? item.policy : 'https' })
+      settingOrigins.push({
+        key: item.setting,
+        policy: typeof item.policy === 'string' ? item.policy : 'https'
+      })
     }
   }
   return { staticOrigins, settingOrigins }
 }
 
+const SETTING_WIDGETS = ['input', 'textarea', 'select'] as const
+
+/** 单条 settings 声明规范化：key/type 必须合法，表单可选字段形状校验后透传（非法项丢弃） */
+function parseSetting(raw: unknown): PluginSetting | null {
+  if (!isRecord(raw) || typeof raw.key !== 'string' || !raw.key) return null
+  if (raw.type !== 'secure' && raw.type !== 'plain') return null
+  const widget =
+    typeof raw.widget === 'string' && (SETTING_WIDGETS as readonly string[]).includes(raw.widget)
+      ? (raw.widget as PluginSetting['widget'])
+      : undefined
+  const options = Array.isArray(raw.options)
+    ? raw.options
+        .filter(
+          (item): item is { label: string; value: string } =>
+            isRecord(item) && typeof item.label === 'string' && typeof item.value === 'string'
+        )
+        .map((item) => ({ label: item.label, value: item.value }))
+    : undefined
+  return {
+    key: raw.key,
+    title: typeof raw.title === 'string' && raw.title ? raw.title : raw.key,
+    type: raw.type,
+    widget: options && options.length ? 'select' : widget,
+    options: options && options.length ? options : undefined,
+    placeholder: typeof raw.placeholder === 'string' ? raw.placeholder : undefined,
+    hint: typeof raw.hint === 'string' ? raw.hint : undefined
+  }
+}
+
 function parseAuth(raw: unknown): PluginAuth | null {
   if (!isRecord(raw) || typeof raw.secret !== 'string' || !raw.secret) return null
   const type = raw.type
-  if (type === 'bearer' || type === 'x-api-key' || type === 'header' || type === 'authorization-scheme') {
+  if (
+    type === 'bearer' ||
+    type === 'x-api-key' ||
+    type === 'header' ||
+    type === 'authorization-scheme'
+  ) {
     return {
       type,
       header: typeof raw.header === 'string' ? raw.header : undefined,
@@ -115,14 +163,16 @@ export function evaluatePlugin(source: string): LoadedPlugin {
   }
 
   const validated = validateDefinition(captured)
-  if (!validated) throw new Error('脚本未调用 defineProvider({...})，或缺少 id / name / endpoints / fetchUsage 字段')
+  if (!validated)
+    throw new Error(
+      '脚本未调用 defineProvider({...})，或缺少 id / name / endpoints / fetchUsage 字段'
+    )
 
   const definition = (captured ?? {}) as Record<string, unknown>
   const { staticOrigins, settingOrigins } = parseEndpoints(definition.endpoints)
-  const settings = (Array.isArray(definition.settings) ? definition.settings : []).filter(
-    (item): item is PluginSetting =>
-      isRecord(item) && typeof item.key === 'string' && (item.type === 'secure' || item.type === 'plain')
-  )
+  const settings = (Array.isArray(definition.settings) ? definition.settings : [])
+    .map(parseSetting)
+    .filter((item): item is PluginSetting => item !== null)
   const manifest: PluginManifest = {
     id: validated.id,
     label: validated.name,

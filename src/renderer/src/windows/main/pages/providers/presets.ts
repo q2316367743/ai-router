@@ -61,3 +61,28 @@ export const PRESET_LABELS = PROVIDER_PRESETS.reduce(
   },
   {} as Record<ProviderKind, string>
 )
+
+/** 预设标签墙选项：「自定义」空串打头 */
+export const KIND_CHIPS: Array<{ label: string; value: ProviderKind | '' }> = [
+  { label: '自定义', value: '' },
+  ...PROVIDER_PRESETS.map((p) => ({ label: p.label, value: p.kind }))
+]
+
+/** 选中预设回填协议时的候选顺序（内置厂商均无 openai-responses 端点） */
+export const PRESET_PROTOCOL_ORDER: ProviderProtocol[] = ['openai', 'anthropic', 'openai-responses']
+
+/** 接口类型 → Base URL 输入提示与说明 */
+export const PROTOCOL_HINTS: Record<ProviderProtocol, { placeholder: string; help: string }> = {
+  openai: {
+    placeholder: 'https://api.deepseek.com/v1',
+    help: '填完整 API 根（含 /v1 等版本/路径前缀，火山云形如 /api/plan/v3）：代理在其后拼 /chat/completions'
+  },
+  'openai-responses': {
+    placeholder: 'https://api.openai.com/v1',
+    help: '填完整 API 根（含 /v1 等版本/路径前缀）：代理在其后拼 /responses'
+  },
+  anthropic: {
+    placeholder: 'https://api.anthropic.com/v1',
+    help: '填完整 API 根（含 /v1 等版本/路径前缀）：代理在其后拼 /messages'
+  }
+}

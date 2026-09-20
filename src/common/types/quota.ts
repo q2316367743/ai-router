@@ -92,7 +92,7 @@ export interface QuotaClassifiedFailure {
   message: string
 }
 
-/** 策略执行上下文：内置 TS 策略与外置脚本同构使用（脚本侧由 prelude 补全便捷层） */
+/** 策略执行上下文：内置 TS 策略与外置脚本同构使用（date/format 等便捷层两侧均由共享 prelude 注入） */
 export interface QuotaStrategyContext {
   /** 提供商 API Key（或 token / cookie 之外的通用凭证） */
   apiKey: string
@@ -104,11 +104,17 @@ export interface QuotaStrategyContext {
   http: {
     getJSON(url: string, opts?: QuotaHttpOptions): Promise<QuotaHttpResponse<unknown>>
     get(url: string, opts?: QuotaHttpOptions): Promise<QuotaHttpResponse<string>>
-    post(url: string, opts?: QuotaHttpOptions & { body: unknown }): Promise<QuotaHttpResponse<string>>
-    postJSON(url: string, opts?: QuotaHttpOptions & { body: unknown }): Promise<QuotaHttpResponse<unknown>>
+    post(
+      url: string,
+      opts?: QuotaHttpOptions & { body: unknown }
+    ): Promise<QuotaHttpResponse<string>>
+    postJSON(
+      url: string,
+      opts?: QuotaHttpOptions & { body: unknown }
+    ): Promise<QuotaHttpResponse<unknown>>
   }
-  /** 策略设置读取器（key 由各策略的 resolveSettings 提供；未提供返回 null） */
-  settings: { get(key: string): string | null }
+  /** 策略设置读取器：get 读 plain 池（附加配置 + BASE_URL），getSecret 读 secure 池（附加配置 + apiKey） */
+  settings: { get(key: string): string | null; getSecret(key: string): string | null }
   /** 分类失败构造器：throw ctx.fail.authenticationExpired('token 已过期') */
   fail: Record<
     | 'authenticationExpired'
@@ -124,6 +130,23 @@ export interface QuotaStrategyContext {
   log: (...args: unknown[]) => void
   /** used/limit → 0~100 百分比（钳制） */
   pct: (used: number, limit: number) => number
+  /** 冻结时钟（本次 fetch 开始时刻），供重置时间与用量区间计算 */
+  date: {
+    now(): Date
+    nowMillis(): number
+    iso(value: string | number): Date
+    unixSeconds(value: number): Date
+    unixMillis(value: number): Date
+    nextDailyReset(timeZone: string, hour: number): Date
+  }
+  /** 数字 / 美元格式化（prelude 便捷层） */
+  format: {
+    number(value: number, options?: { minimumFractionDigits?: number; maximumFractionDigits?: number }): string
+    usd(value: number): string
+    monthDay(value: string | number | Date): string
+  }
+  /** 明细标签可用性（1~40 字符） */
+  isDetailLabel(value: unknown): boolean
 }
 
 export interface QuotaHttpOptions {
@@ -141,6 +164,24 @@ export interface QuotaHttpResponse<T> {
   bodyText?: string
 }
 
+/**
+ * 策略附加配置声明项：驱动提供商抽屉的动态表单（声明来源 = 插件 settings[] 或 native meta.settings）。
+ * 值统一存 providers.strategyConfig（字符串键值对）；声明之外的键在表单提交时原样保留。
+ */
+export interface QuotaStrategySetting {
+  key: string
+  title: string
+  /** secure = 密文输入，运行时进 secure 设置池；缺省 plain */
+  type?: 'plain' | 'secure'
+  /** 控件：缺省 input（secure 缺省密码框）；长文本用 textarea；枚举用 select */
+  widget?: 'input' | 'textarea' | 'select'
+  /** widget='select' 的选项 */
+  options?: Array<{ label: string; value: string }>
+  placeholder?: string
+  /** 输入框下方的辅助说明 */
+  hint?: string
+}
+
 /** 策略元信息：目录展示与凭证要求说明 */
 export interface QuotaStrategyMeta {
   id: string
@@ -155,6 +196,8 @@ export interface QuotaStrategyMeta {
   credential: 'apiKey' | 'token' | 'cookie' | 'none'
   /** 目录里的一句话说明 */
   description?: string
+  /** 附加配置声明：非空时提供商抽屉按声明渲染动态表单（替换裸 JSON 输入） */
+  settings?: QuotaStrategySetting[] | null
 }
 
 /** 注册表条目：元信息 + 受类型约束的执行方法 */

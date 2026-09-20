@@ -9,7 +9,7 @@
     </div>
 
     <template #viz>
-      <UsageHeatmap :activity="view" />
+      <UsageHeatmap :activity="view" :compact="compact" />
     </template>
   </MetricCard>
 </template>

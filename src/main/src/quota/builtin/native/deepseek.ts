@@ -13,7 +13,9 @@ export const deepseekStrategy: QuotaStrategy = {
     description: '官方余额接口：按用量计费账户的人民币/美元余额'
   },
   async fetch(ctx) {
-    const res = await ctx.http.getJSON(BALANCE_URL, { headers: { Authorization: `Bearer ${ctx.apiKey}` } })
+    const res = await ctx.http.getJSON(BALANCE_URL, {
+      headers: { Authorization: `Bearer ${ctx.apiKey}` }
+    })
     if (res.status === 401) throw ctx.fail.missingCredential('DeepSeek API Key 无效')
     if (res.status !== 200) throw ctx.fail.apiFailure(`HTTP ${res.status}`)
 

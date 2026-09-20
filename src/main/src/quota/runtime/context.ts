@@ -13,7 +13,11 @@ export const FETCH_TIMEOUT_MS = 20_000
 
 export function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(makeFailure('provider-unavailable', `${label} 超时（${Math.round(ms / 1000)}s）`)), ms)
+    const timer = setTimeout(
+      () =>
+        reject(makeFailure('provider-unavailable', `${label} 超时（${Math.round(ms / 1000)}s）`)),
+      ms
+    )
     promise.then(
       (value) => {
         clearTimeout(timer)
@@ -36,10 +40,7 @@ function isAllowedByPolicy(origin: string, policy: string): boolean {
 }
 
 /** 运行时解析端点白名单：字符串端点 + setting 型端点（从设置池取 URL） */
-function resolveAllowedOrigins(
-  manifest: PluginManifest,
-  pool: Record<string, string>
-): string[] {
+function resolveAllowedOrigins(manifest: PluginManifest, pool: Record<string, string>): string[] {
   const origins = [...manifest.staticOrigins]
   for (const item of manifest.settingOrigins) {
     const value = pool[item.key]?.trim()
@@ -68,7 +69,8 @@ function normalizeWindow(raw: QuotaRateWindow | null | undefined): QuotaRateWind
   }
   return {
     usedPercent: Math.min(100, Math.max(0, Number(raw.usedPercent))),
-    windowMinutes: typeof raw.windowMinutes === 'number' && raw.windowMinutes > 0 ? raw.windowMinutes : null,
+    windowMinutes:
+      typeof raw.windowMinutes === 'number' && raw.windowMinutes > 0 ? raw.windowMinutes : null,
     resetsAt,
     resetDescription: typeof raw.resetDescription === 'string' ? raw.resetDescription : null
   }
@@ -125,7 +127,11 @@ export function makeNativeContext(inputs: ExecInputs): QuotaStrategyContext {
     manifest: {
       id: 'native',
       label: 'native',
-      settings: Object.keys(settingsPool).map((key) => ({ key, title: key, type: 'plain' as const })),
+      settings: Object.keys(settingsPool).map((key) => ({
+        key,
+        title: key,
+        type: 'plain' as const
+      })),
       auth: null,
       capabilities: [],
       cookieDomains: [],
@@ -149,13 +155,17 @@ export function makeNativeContext(inputs: ExecInputs): QuotaStrategyContext {
 }
 
 /** 执行外置脚本策略：组装设置池与白名单 → prelude 注入 → fetchUsage → 快照规范化 */
-export async function fetchByPlugin(plugin: LoadedPlugin, inputs: ExecInputs): Promise<QuotaSnapshot> {
+export async function fetchByPlugin(
+  plugin: LoadedPlugin,
+  inputs: ExecInputs
+): Promise<QuotaSnapshot> {
   const { manifest } = plugin
   // 设置池：附加配置全量进 plain；secure 池 = 附加配置 + auth.secret ← 提供商 API Key
   const settingsPool: Record<string, string> = { ...inputs.config }
   if (inputs.baseUrl) settingsPool.BASE_URL ??= inputs.baseUrl
   const secretsPool: Record<string, string> = { ...inputs.config }
-  if (manifest.auth && inputs.apiKey.trim()) secretsPool[manifest.auth.secret] = inputs.apiKey.trim()
+  if (manifest.auth && inputs.apiKey.trim())
+    secretsPool[manifest.auth.secret] = inputs.apiKey.trim()
 
   const bridge = createHostBridge({
     manifest,
@@ -182,7 +192,8 @@ export async function fetchByPlugin(plugin: LoadedPlugin, inputs: ExecInputs): P
   return normalizeSnapshot(result)
 }
 
-let cachedApply: ((ctx: Record<string, unknown>, host: Record<string, unknown>) => void) | null = null
+let cachedApply: ((ctx: Record<string, unknown>, host: Record<string, unknown>) => void) | null =
+  null
 
 /** 求值 prelude（编译一次缓存），把 http/settings/date/fail 等便捷层注入 ctx */
 function applyPreludeToContext(ctx: Record<string, unknown>, host: Record<string, unknown>): void {

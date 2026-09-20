@@ -11,7 +11,8 @@ export const codebuffStrategy: QuotaStrategy = {
     label: 'Codebuff',
     builtin: true,
     credential: 'token',
-    description: '账号用量与订阅信息；令牌来自附加配置 token（或本地凭证）'
+    description: '账号用量与订阅信息；令牌来自附加配置 token（或本地凭证）',
+    settings: [{ key: 'token', title: 'Codebuff 令牌', type: 'secure', hint: '缺省使用提供商 API Key' }]
   },
   async fetch(ctx) {
     const token = strOf(ctx.config.token) ?? (ctx.apiKey.trim() ? ctx.apiKey.trim() : null)

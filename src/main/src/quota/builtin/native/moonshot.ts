@@ -8,7 +8,19 @@ export const moonshotStrategy: QuotaStrategy = {
     label: 'Moonshot AI',
     builtin: true,
     credential: 'apiKey',
-    description: '官方余额接口：现金余额 + 代金券余额；附加配置 region=cn 切换中国区'
+    description: '官方余额接口：现金余额 + 代金券余额；附加配置 region=cn 切换中国区',
+    settings: [
+      {
+        key: 'region',
+        title: '区域',
+        widget: 'select',
+        options: [
+          { label: '国际区（api.moonshot.ai）', value: 'international' },
+          { label: '中国区（api.moonshot.cn）', value: 'cn' }
+        ],
+        hint: '缺省国际区'
+      }
+    ]
   },
   async fetch(ctx) {
     const host = strOf(ctx.config.region) === 'cn' ? 'https://api.moonshot.cn' : 'https://api.moonshot.ai'

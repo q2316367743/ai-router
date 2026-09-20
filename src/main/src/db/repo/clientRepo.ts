@@ -1,5 +1,5 @@
 import { and, gte, lte, sql } from 'drizzle-orm'
-import type { UsageClientItem, UsageClientStats } from '@common/types'
+import type { UsageAgentFlow, UsageAgentFlowLink, UsageClientItem, UsageClientStats } from '@common/types'
 import { db } from '../client'
 import { requestLogs } from '../schema'
 import { resolveRange } from './usageRepo'
@@ -35,4 +35,39 @@ export function queryClientStats(): UsageClientStats {
     .sort((a, b) => b.requestCount - a.requestCount || a.name.localeCompare(b.name))
 
   return { startDate: range.startKey, endDate: range.endKey, items }
+}
+
+/**
+ * Agent × 提供商交叉流量（桑基图用）：窗口内按 `(client, provider_name)` 分组计数，请求数降序。
+ *
+ * 与来源请求数同源：聚合表按「时间桶 × 供应商 × 模型」分区、没有来源维度，只有日志表同时有
+ * client 与 provider_name，故窗口固定近七天、含失败请求。Top 截断与「其他」合并留给前端。
+ */
+export function queryAgentProviderFlow(): UsageAgentFlow {
+  const range = resolveRange('last7d')
+  const rows = db()
+    .select({
+      client: requestLogs.client,
+      providerName: requestLogs.providerName,
+      requestCount: sql<number>`count(*)`
+    })
+    .from(requestLogs)
+    .where(and(gte(requestLogs.logDate, range.startKey), lte(requestLogs.logDate, range.endKey)))
+    .groupBy(requestLogs.client, requestLogs.providerName)
+    .all()
+
+  const links: UsageAgentFlowLink[] = rows
+    .map((row) => ({
+      client: row.client ?? UNKNOWN_CLIENT,
+      providerName: row.providerName,
+      requestCount: Number(row.requestCount)
+    }))
+    .sort(
+      (a, b) =>
+        b.requestCount - a.requestCount ||
+        a.client.localeCompare(b.client) ||
+        a.providerName.localeCompare(b.providerName)
+    )
+
+  return { startDate: range.startKey, endDate: range.endKey, links }
 }

@@ -97,6 +97,29 @@ export interface UsageClientStats {
   items: UsageClientItem[]
 }
 
+/** Agent → 提供商 的流量连线（桑基图用），requestCount 含失败请求 */
+export interface UsageAgentFlowLink {
+  /** 来源 Agent 标识（user-agent 归一；未携带 UA 归「未知」） */
+  client: string
+  /** 提供商名快照 */
+  providerName: string
+  /** 窗口内请求数（含失败，与「来源 Agent 请求数」同口径） */
+  requestCount: number
+}
+
+/**
+ * Agent × 提供商交叉流量：固定近七天窗口，数据源为 request_logs。
+ * 聚合表无来源维度、日志表只保留 7 天，故与「来源 Agent 请求数」「模型速度」同一取舍。
+ */
+export interface UsageAgentFlow {
+  /** 窗口起始日（含），YYYY-MM-DD */
+  startDate: string
+  /** 窗口结束日（含），YYYY-MM-DD */
+  endDate: string
+  /** 按请求数降序 */
+  links: UsageAgentFlowLink[]
+}
+
 /** 活跃度单日格子 */
 export interface UsageActivityCell {
   /** YYYY-MM-DD */

@@ -18,6 +18,13 @@ interface CodexBarSetting {
   title: string;
   subtitle?: string;
   type?: "plain" | "secure";
+  /** 表单控件（宿主 UI 用）：缺省 input（secure 缺省密码框） */
+  widget?: "input" | "textarea" | "select";
+  /** widget=select 的选项 */
+  options?: Array<{ label: string; value: string }>;
+  placeholder?: string;
+  /** 输入框下方的辅助说明 */
+  hint?: string;
 }
 
 interface CodexBarRateWindow {

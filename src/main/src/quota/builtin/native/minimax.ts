@@ -11,7 +11,19 @@ export const minimaxStrategy: QuotaStrategy = {
     label: 'MiniMax',
     builtin: true,
     credential: 'apiKey',
-    description: 'Coding Plan 剩余量：当期窗口用量；附加配置 region=global 切海外区'
+    description: 'Coding Plan 剩余量：当期窗口用量；附加配置 region=global 切海外区',
+    settings: [
+      {
+        key: 'region',
+        title: '区域',
+        widget: 'select',
+        options: [
+          { label: '中国区（api.minimaxi.com）', value: 'cn' },
+          { label: '海外区（api.minimax.io）', value: 'global' }
+        ],
+        hint: '缺省中国区'
+      }
+    ]
   },
   async fetch(ctx) {
     const host = strOf(ctx.config.region) === 'global' ? 'https://api.minimax.io' : 'https://api.minimaxi.com'

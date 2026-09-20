@@ -87,7 +87,9 @@
         <span class="text-12px text-td-secondary">{{ strategyHelp }}</span>
       </template>
     </t-form-item>
-    <t-form-item v-if="needStrategyConfig" label="附加配置（JSON）">
+    <!-- 策略声明了附加配置 → 动态表单；未声明但凭证需要（cookie/token）→ 裸 JSON（含已停用外置策略占位） -->
+    <StrategyConfigForm v-if="declaredSettings.length" :settings="declaredSettings" :config="configForm" />
+    <t-form-item v-else-if="needStrategyConfig" label="附加配置（JSON）">
       <t-textarea
         v-model="form.strategyConfig"
         :autosize="{ minRows: 3, maxRows: 6 }"
@@ -111,8 +113,10 @@
 
 <script lang="ts" setup>
 import type { ProviderInfo, ProviderKind, ProviderProtocol, QuotaStrategyInfo } from '@common/types'
+import { parseQuotaConfig } from '@common/utils/quotaConfig'
 import { MessageUtil } from '@/utils/modal'
-import { PROVIDER_PRESETS, getPreset } from '../presets'
+import StrategyConfigForm from './components/StrategyConfigForm.vue'
+import { KIND_CHIPS, PRESET_PROTOCOL_ORDER, PROTOCOL_HINTS, getPreset } from '../presets'
 
 const props = defineProps<{
   provider: ProviderInfo | null
@@ -122,31 +126,8 @@ const emit = defineEmits<{
   success: []
 }>()
 
-const PROTOCOL_HINTS: Record<ProviderProtocol, { placeholder: string; help: string }> = {
-  openai: {
-    placeholder: 'https://api.deepseek.com/v1',
-    help: '填完整 API 根（含 /v1 等版本/路径前缀，火山云形如 /api/plan/v3）：代理在其后拼 /chat/completions'
-  },
-  'openai-responses': {
-    placeholder: 'https://api.openai.com/v1',
-    help: '填完整 API 根（含 /v1 等版本/路径前缀）：代理在其后拼 /responses'
-  },
-  anthropic: {
-    placeholder: 'https://api.anthropic.com/v1',
-    help: '填完整 API 根（含 /v1 等版本/路径前缀）：代理在其后拼 /messages'
-  }
-}
-
 const saving = ref(false)
 const showKey = ref(false)
-
-/** 选中预设后回填协议时的候选顺序（内置厂商均无 openai-responses 端点） */
-const PRESET_PROTOCOL_ORDER: ProviderProtocol[] = ['openai', 'anthropic', 'openai-responses']
-
-const KIND_CHIPS: Array<{ label: string; value: ProviderKind | '' }> = [
-  { label: '自定义', value: '' },
-  ...PROVIDER_PRESETS.map((p) => ({ label: p.label, value: p.kind }))
-]
 
 const form = reactive({
   kind: (props.provider?.kind ?? '') as ProviderKind | '',
@@ -197,9 +178,26 @@ const credential = computed(() => selectedStrategy.value?.credential ?? 'apiKey'
 
 /** 非 API Key 凭证策略需要附加配置（Cookie / 令牌） */
 const needStrategyConfig = computed(
-  () =>
-    selectedStrategy.value !== null && credential.value !== 'apiKey' && credential.value !== 'none'
+  () => selectedStrategy.value !== null && credential.value !== 'apiKey' && credential.value !== 'none'
 )
+
+/** 已有 strategyConfig 的字符串键值（与 main 执行侧同口径），供表单回显；声明之外的未知键在此保留 */
+const configForm = reactive<Record<string, string>>(parseQuotaConfig(form.strategyConfig))
+
+/** 选中策略声明的附加配置（非空时渲染动态表单替换 JSON 输入） */
+const declaredSettings = computed(() => selectedStrategy.value?.settings ?? [])
+
+/** 附加配置序列化：有声明 → 表单去空白值 JSON 化（未知键保留）；无声明 → 原文 */
+function serializeStrategyConfig(): string | null {
+  if (declaredSettings.value.length) {
+    const result: Record<string, string> = {}
+    for (const [key, value] of Object.entries(configForm)) {
+      if (value.trim()) result[key] = value
+    }
+    return JSON.stringify(result)
+  }
+  return form.strategyConfig.trim() || null
+}
 
 const configPlaceholder = computed(() =>
   credential.value === 'cookie' ? '{"cookie":"session=..."}' : '{"token":"..."}'
@@ -277,10 +275,7 @@ async function submit(): Promise<void> {
       baseUrl: form.baseUrl.trim(),
       apiKey: form.apiKey.trim(),
       quotaStrategyId: form.quotaStrategyId || null,
-      strategyConfig:
-        form.quotaStrategyId && needStrategyConfig.value && form.strategyConfig.trim()
-          ? form.strategyConfig.trim()
-          : null,
+      strategyConfig: form.quotaStrategyId ? serializeStrategyConfig() : null,
       enabled: form.enabled
     }
     if (props.provider) {

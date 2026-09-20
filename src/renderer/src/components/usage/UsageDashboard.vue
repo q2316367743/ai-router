@@ -68,7 +68,7 @@
  * - compact=true 时压缩图表高度以适配托盘窄面板（栅格降为 2 列）。
  */
 import { computed } from 'vue'
-import type { UsageClientStats, UsageModelSpeed, UsageRangeKey } from '@common/types'
+import type { UsageAgentFlow, UsageClientStats, UsageModelSpeed, UsageRangeKey } from '@common/types'
 import type { UseUsageStatsResult } from './useUsageStats'
 import type { DashboardCardContext, DashboardCardSpan } from './cardTypes'
 import type { DashboardSurface } from '@common/types'
@@ -82,6 +82,8 @@ const props = withDefaults(
     speed?: UsageModelSpeed | null
     /** 来源 Agent 请求数数据（同上） */
     clients?: UsageClientStats | null
+    /** Agent × 提供商交叉流量（固定近七天，仅首页取数） */
+    agentFlow?: UsageAgentFlow | null
     /** 统计维度候选（两端一致：今天 / 近24小时 / 近七天 / 近30天） */
     ranges?: UsageRangeKey[]
     /** 是否展示供应商 / 模型筛选 */
@@ -92,6 +94,7 @@ const props = withDefaults(
   {
     speed: null,
     clients: null,
+    agentFlow: null,
     ranges: () => ['today', 'last24h', 'last7d', 'last30d'],
     showFilters: true,
     compact: false
@@ -113,7 +116,8 @@ const ctx = computed<DashboardCardContext>(() => ({
   stats: props.stats,
   compact: props.compact,
   speed: props.speed,
-  clients: props.clients
+  clients: props.clients,
+  agentFlow: props.agentFlow
 }))
 
 /** 注册表 × 用户布局配置合并出的卡片序列（含隐藏卡，隐藏卡保留位置） */
