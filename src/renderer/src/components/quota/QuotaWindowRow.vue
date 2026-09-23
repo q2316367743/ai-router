@@ -7,15 +7,31 @@
       </span>
       <span v-if="resetText" class="quota-window__reset">{{ resetText }}</span>
     </div>
-    <div class="quota-bar" role="progressbar" :aria-valuenow="usedPercent" aria-valuemin="0" aria-valuemax="100">
-      <span class="quota-bar__fill" :style="{ width: `${usedPercent}%`, background: fillColor }"></span>
-      <span v-for="tick in TICKS" :key="tick" class="quota-bar__tick" :style="{ left: `${tick}%` }"></span>
+    <!-- 填充长度 = 剩余（剩余 100% 即满格），与副题「x% 剩余」同一口径 -->
+    <div
+      class="quota-bar"
+      role="progressbar"
+      :aria-valuenow="remaining"
+      aria-valuemin="0"
+      aria-valuemax="100"
+    >
+      <span
+        class="quota-bar__fill"
+        :style="{ width: `${remaining}%`, background: fillColor }"
+      ></span>
+      <span
+        v-for="tick in TICKS"
+        :key="tick"
+        class="quota-bar__tick"
+        :style="{ left: `${tick}%` }"
+      ></span>
     </div>
   </div>
 </template>
 
 <script lang="ts" setup>
 import type { QuotaRateWindow } from '@common/types'
+import { quotaWindowSeverity, remainingPercent } from '@common/utils/quotaDisplay'
 
 const props = defineProps<{
   title: string
@@ -27,11 +43,13 @@ const TICKS = [25, 50, 75]
 
 const usedPercent = computed(() => Math.min(100, Math.max(0, props.win.usedPercent)))
 
-/** 剩余 = 100 - 已用；整数不带小数，小数保留一位 */
-const remainingText = computed(() => {
-  const remaining = Math.round((100 - usedPercent.value) * 10) / 10
-  return Number.isInteger(remaining) ? String(remaining) : remaining.toFixed(1)
-})
+/** 剩余百分比（0~100，一位小数）：进度条填充与文案都用它 */
+const remaining = computed(() => remainingPercent(props.win.usedPercent))
+
+/** 整数不带小数，小数保留一位 */
+const remainingText = computed(() =>
+  Number.isInteger(remaining.value) ? String(remaining.value) : remaining.value.toFixed(1)
+)
 
 const resetText = computed(() => {
   const at = props.win.resetsAt
@@ -40,11 +58,11 @@ const resetText = computed(() => {
   return `${countdown(at)}后重置`
 })
 
-/** 填充表示「已用」，剩余越少越危险 */
+/** 剩余越少条越短、颜色越危险（档位阈值与托盘额度卡共用一处，见 @common/utils/quotaDisplay） */
 const fillColor = computed(() => {
-  const used = usedPercent.value
-  if (used >= 90) return 'var(--td-error-color)'
-  if (used >= 70) return 'var(--td-warning-color)'
+  const severity = quotaWindowSeverity(usedPercent.value)
+  if (severity === 'poor') return 'var(--td-error-color)'
+  if (severity === 'fair') return 'var(--td-warning-color)'
   return 'var(--td-brand-color)'
 })
 

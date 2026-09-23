@@ -62,9 +62,10 @@
 
 <script lang="ts" setup>
 import type { ProviderQuotaInfo, QuotaCostSnapshot, QuotaRateWindow } from '@common/types'
-import { formatTime } from '@/utils/format'
+import { windowTitleOf, currencyPrefix } from '@common/utils/quotaDisplay'
+import QuotaWindowRow from '@/components/quota/QuotaWindowRow.vue'
+import { formatTime, relativeTime } from '@/utils/format'
 import QuotaDetailChart from './QuotaDetailChart.vue'
-import QuotaWindowRow from './QuotaWindowRow.vue'
 
 const props = defineProps<{
   item: ProviderQuotaInfo
@@ -89,29 +90,20 @@ const windows = computed<CardWindow[]>(() => {
   if (!snap) return []
   const rows: CardWindow[] = []
   const push = (fallback: string, key: string, win: QuotaRateWindow | null | undefined): void => {
-    if (win) rows.push({ key, title: windowTitle(fallback, win), win })
+    if (win) rows.push({ key, title: windowTitleOf(fallback, win), win })
   }
   push('主窗口', 'primary', snap.primary)
   push('次窗口', 'secondary', snap.secondary)
   push('第三窗口', 'tertiary', snap.tertiary)
   for (const extra of snap.extraWindows ?? []) {
-    rows.push({ key: extra.id, title: extra.title || windowTitle('附加窗口', extra.window), win: extra.window })
+    rows.push({
+      key: extra.id,
+      title: extra.title || windowTitleOf('附加窗口', extra.window),
+      win: extra.window
+    })
   }
   return rows
 })
-
-/** 窗口标题按 windowMinutes 归一（5 小时 / 每周 / 每月），否则回退策略说明或序号名 */
-function windowTitle(fallback: string, win: QuotaRateWindow): string {
-  const minutes = win.windowMinutes
-  if (!minutes) return win.resetDescription || fallback
-  if (minutes === 300) return '5 小时'
-  if (minutes === 24 * 60) return '每日'
-  if (minutes === 7 * 24 * 60) return '每周'
-  if (minutes === 30 * 24 * 60) return '每月'
-  if (minutes % 1440 === 0) return `${minutes / 1440} 天`
-  if (minutes % 60 === 0) return `${minutes / 60} 小时`
-  return `${minutes} 分钟`
-}
 
 const updatedText = computed(() =>
   props.item.queriedAt ? `${relativeTime(props.item.queriedAt)}已更新` : '等待首次查询'
@@ -132,13 +124,6 @@ const identityText = computed(() => {
   return [identity.email, identity.organization, identity.accountID].filter(Boolean).join(' · ')
 })
 
-function currencyPrefix(currency: string): string {
-  const code = currency.toUpperCase()
-  if (code === 'USD') return '$'
-  if (code === 'CNY' || code === 'RMB') return '¥'
-  return currency ? `${currency} ` : ''
-}
-
 function costSummaryOf(cost: QuotaCostSnapshot): string {
   const prefix = currencyPrefix(cost.currency)
   // 余额优先：DeepSeek 这类账户余额型会带 used=0（0 也是「有值」），不能用 != null 判断
@@ -146,15 +131,6 @@ function costSummaryOf(cost: QuotaCostSnapshot): string {
   if (cost.limit != null) return `${prefix}${cost.used} / ${prefix}${cost.limit}`
   if (cost.used) return `${prefix}${cost.used}`
   return ''
-}
-
-function relativeTime(ms: number): string {
-  const minutes = Math.floor((Date.now() - ms) / 60_000)
-  if (minutes < 1) return '刚刚'
-  if (minutes < 60) return `${minutes}分钟前`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}小时前`
-  return `${Math.floor(hours / 24)}天前`
 }
 </script>
 

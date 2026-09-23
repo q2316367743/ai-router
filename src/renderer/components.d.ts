@@ -12,6 +12,7 @@ declare module 'vue' {
     MiniBars: typeof import('./src/components/usage/MiniBars.vue')['default']
     MiniProgress: typeof import('./src/components/usage/MiniProgress.vue')['default']
     PageLayout: typeof import('./src/components/PageLayout/PageLayout.vue')['default']
+    QuotaWindowRow: typeof import('./src/components/quota/QuotaWindowRow.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     ServiceStatusBar: typeof import('./src/components/service/ServiceStatusBar.vue')['default']

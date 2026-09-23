@@ -23,6 +23,15 @@
         <DashboardLayoutEditor />
       </div>
 
+      <!-- 托盘额度 -->
+      <div class="card mt-12px">
+        <div class="font-500">托盘额度</div>
+        <div class="text-13px text-td-secondary mt-4px mb-12px">
+          托盘面板「额度」页展示哪些提供商、顺序与余额告警阈值；改动立即生效并同步到另一窗口
+        </div>
+        <TrayQuotaEditor />
+      </div>
+
       <!-- 启动 -->
       <div class="card mt-12px">
         <div class="flex items-center justify-between gap-16px">
@@ -71,6 +80,7 @@
 import { onMounted, ref, computed } from 'vue'
 import PageLayout from '@/components/PageLayout/PageLayout.vue'
 import DashboardLayoutEditor from './components/DashboardLayoutEditor.vue'
+import TrayQuotaEditor from './components/TrayQuotaEditor.vue'
 import { useColorMode } from '@/hooks/colorMode'
 import { MessageUtil } from '@/utils/modal'
 
