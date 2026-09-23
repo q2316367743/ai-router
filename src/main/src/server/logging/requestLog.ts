@@ -26,7 +26,10 @@ export interface ProxyLogEntry extends HistoryRef {
   stream: boolean
   usage: TokenUsage | null
   error: string | null
-  /** 出站请求正文（实际发给提供商的 JSON 文本；未发起上游请求时为 null） */
+  /**
+   * 请求正文：转发行 = 实际发给提供商的出站 JSON 文本；本地拦截行（`local`）= 客户端入站
+   * 正文（401 分支有界读取，可能截断）。两者口径不同，排查时以 `local` 区分。
+   */
   reqBody: string | null
   /** 出站请求标头（脱敏后的 JSON 文本；未发起上游请求时为 null） */
   reqHeaders: string | null
@@ -36,6 +39,11 @@ export interface ProxyLogEntry extends HistoryRef {
   resHeaders: string | null
   /** 渠道重试轨迹（`RetryAttempt[]` 的 JSON 文本）：无改道时为 null */
   retryTrace: string | null
+  /**
+   * 本地拦截行标记（401 / 400 / 404 / 503：未向提供商发起请求）：
+   * 这类行的正文是入站口径，且不参与 token 估算（未出云就没有 token 可算）。
+   */
+  local?: boolean
 }
 
 /**
@@ -58,7 +66,8 @@ export function startRequest(entry: RequestLogStart): void {
  * - 详细日志：request_logs，保留 7 天，供日志页排查；按 requestId upsert，
  *   已落 pending 行的请求在此回填状态、耗时、token 与正文标头。
  * - 用量聚合：usage_daily / usage_hourly，永久 + 7 天，供统计看板；成功与失败都会计入请求数，
- *   token 只在成功请求时累加（失败请求 usage 为 null，本地拦截的估算值也不应污染 token 统计）。
+ *   token 只在成功请求时累加（失败请求 usage 为 null，本地拦截行 `local` 直接跳过估算，
+ *   否则入站正文会被当成出站正文算成 token 污染统计）。
  * - 提供商未上报用量时基于请求正文估算，计入 unrecognizedTokens（估算只做一次，两处共用）。
  */
 export function recordRequest(entry: ProxyLogEntry): void {
@@ -73,7 +82,7 @@ export function recordRequest(entry: ProxyLogEntry): void {
         usage.cacheWriteTokens
       : 0
     const hasUsage = reported > 0 || (usage?.totalTokens ?? 0) > 0
-    const estimated = hasUsage ? 0 : estimateTokens(entry.reqBody)
+    const estimated = hasUsage || entry.local ? 0 : estimateTokens(entry.reqBody)
     const ok = entry.status >= 200 && entry.status < 300
     const durationMs = finishedAt - entry.startedAt
 
@@ -182,4 +191,9 @@ export function estimateTokens(text: string | null): number {
   if (!text) return 0
   const cjk = text.match(/[\u4e00-\u9fff\u3040-\u30ff\u31f0-\u31ff\uac00-\ud7af]/g)?.length ?? 0
   return cjk + Math.ceil((text.length - cjk) / 4)
+}
+
+/** 本地拦截行的入站正文：请求体已被 express.json 解析，原样序列化即可（无正文时 null） */
+export function inboundBody(body: unknown): string | null {
+  return body === undefined ? null : (JSON.stringify(body) ?? null)
 }

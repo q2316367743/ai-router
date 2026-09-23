@@ -3,7 +3,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { ProviderProtocol } from '@common/types'
 import { findRoutes } from '$/db/repo/modelRepo'
 import { getBalancerConfig, blockReasonOf, orderCandidates, sessionKeyOf } from '../balancer'
-import { parseClientName, recordRequest } from '../logging/requestLog'
+import { inboundBody, parseClientName, recordRequest } from '../logging/requestLog'
 import { forwardRequest } from '../strategies/forward'
 import { strategyOf } from '../strategies/registry'
 import type { MappingRoute } from '$/db/repo/modelRepo'
@@ -44,6 +44,8 @@ export function createEntryHandler(protocol: ProviderProtocol): HandleResult {
         stream: false,
         usage: null,
         error: 'invalid request body',
+        local: true,
+        // 非对象正文（数组 / 标量）没有可排查的请求侧信息
         reqBody: null,
         reqHeaders: null,
         resBody,
@@ -70,8 +72,9 @@ export function createEntryHandler(protocol: ProviderProtocol): HandleResult {
         stream: false,
         usage: null,
         error: "'model' is required",
-        // 日志为线上口径：未向提供商发起请求，出站请求侧记 null
-        reqBody: null,
+        // 本地拦截行：记客户端入站正文（未向提供商发起请求，出站侧本就不存在）
+        local: true,
+        reqBody: inboundBody(parsed),
         reqHeaders: null,
         resBody,
         resHeaders: null,
@@ -113,7 +116,8 @@ export function createEntryHandler(protocol: ProviderProtocol): HandleResult {
         stream: false,
         usage: null,
         error: archived ? 'model archived' : 'model not found or disabled',
-        reqBody: null,
+        local: true,
+        reqBody: inboundBody(parsed),
         reqHeaders: null,
         resBody,
         resHeaders: null,
@@ -148,7 +152,8 @@ export function createEntryHandler(protocol: ProviderProtocol): HandleResult {
         stream: false,
         usage: null,
         error: message,
-        reqBody: null,
+        local: true,
+        reqBody: inboundBody(parsed),
         reqHeaders: null,
         resBody,
         resHeaders: null,

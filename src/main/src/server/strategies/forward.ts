@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { ProviderProtocol, RetryAttempt } from '@common/types'
 import type { MappingRoute } from '$/db/repo/modelRepo'
-import { recordRequest } from '../logging/requestLog'
+import { inboundBody, recordRequest } from '../logging/requestLog'
 import { errMsg } from '../respond'
 import { joinEndpoint, upstreamPathOf } from '../upstream/urls'
 import {
@@ -105,7 +105,9 @@ export async function forwardRequest(
           stream: false,
           usage: null,
           error: message,
-          reqBody: null,
+          // 本地拦截行：记客户端入站正文（转换失败在发请求之前，出站侧不存在）
+          local: true,
+          reqBody: inboundBody(body),
           reqHeaders: null,
           resBody,
           resHeaders: null,
