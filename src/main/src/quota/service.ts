@@ -1,11 +1,12 @@
 /**
- * 余量查询服务：外置策略装载、单提供商/全量刷新、目录与列表组装。
+ * 余量查询服务：启动装载（内置 + 外置策略）、单提供商/全量刷新、目录与列表组装。
  * 策略执行统一经 makeNativeContext（脚本策略在其 fetch 包装内再走完整脚本运行时）。
  */
 import type { ProviderQuotaInfo, QuotaStrategyInfo, QuotaStrategyMeta } from '@common/types'
 import { parseQuotaConfig } from '@common/utils/quotaConfig'
 import { listProviders } from '$/db/repo/providerRepo'
 import { listQuotaPlugins, listQuotaSnapshots, saveQuotaResult } from '$/db/repo/quotaRepo'
+import { registerBuiltinStrategies } from './builtin'
 import { describeError } from './runtime/failure'
 import {
   FETCH_TIMEOUT_MS,
@@ -16,6 +17,29 @@ import {
 } from './runtime/context'
 import { evaluatePlugin } from './runtime/evaluate'
 import { getStrategy, listStrategies, registerStrategy, unregisterStrategy } from './registry'
+
+/**
+ * 启动装载：注册内置策略 → 重载外置策略 → 预热脚本宿主。
+ *
+ * 只做装载不做定时，刷新节奏由 scheduler 域的 quota:refresh 任务决定。失败只记错不抛：
+ * 余量模块不能拖垮启动链，此后每轮刷新仍会逐家报告失败原因，页面手动刷新可重试。
+ */
+export function initQuota(): void {
+  try {
+    registerBuiltinStrategies()
+    reloadExternalStrategies()
+    // 预热脚本宿主：prelude 求值问题在启动期暴露，而不是第一次查询时才静默挂掉
+    makeNativeContext({ apiKey: '', baseUrl: '', config: {} })
+    const catalog = listStrategies()
+    const builtinCount = catalog.filter((strategy) => strategy.meta.builtin).length
+    console.log(`[quota] 策略已装载：内置 ${builtinCount} / 外置 ${catalog.length - builtinCount}`)
+  } catch (err) {
+    console.error(
+      '[quota] 策略装载失败（不影响应用其他功能）：',
+      err instanceof Error ? err.message : err
+    )
+  }
+}
 
 /** 启动/变更后重载全部外置策略：先清非内置条目，再逐个 eval 注册（跳过禁用行） */
 export function reloadExternalStrategies(): void {

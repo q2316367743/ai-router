@@ -22,7 +22,8 @@ import { dayLabel, hourLabel, todayKey } from '$/utils/date'
 /**
  * 用量聚合仓储：写入按「时间桶 × 供应商 × 模型」累加，读取按统计维度聚合为看板数据。
  *
- * - 两张聚合表列集合完全一致，仅时间桶键与粒度不同：usage_daily（天，永久）/ usage_hourly（小时，7 天）。
+ * - 两张聚合表列集合完全一致，仅时间桶键与粒度不同：usage_daily（天，永久）/ usage_hourly（小时，7 天，
+ *   超窗清理由 scheduler 的 usage:retention 任务调用本文件的 cleanupExpiredHourly）。
  * - 统计口径集中在本文件：token 只累加成功请求；请求数与耗时不分成败；成功率 = successCount / requestCount。
  * - 唯一例外是模型速度折线：它需要「成功请求耗时」这个聚合表没有的口径，故直接实时聚合 request_logs，
  *   实现在同目录的 `speedRepo.ts`。
@@ -178,8 +179,6 @@ export function accumulateUsage(input: UsageAccumulateInput): void {
       })
       .run()
   })
-
-  cleanupExpiredHourly()
 }
 
 /** 冲突累加：两表列集合一致，仅表引用不同 */
@@ -205,8 +204,13 @@ function conflictSet(table: UsageTable) {
   }
 }
 
-/** 清理超出保留窗口的小时桶 */
-function cleanupExpiredHourly(): void {
+/**
+ * 清理超出保留窗口的小时桶。
+ *
+ * 由 scheduler 域的 usage:retention 任务每日调用；原先挂在每个请求的聚合写入末尾，
+ * 让写路径白白多背一条 DELETE——清理频率本该由时间决定，不由流量决定。
+ */
+export function cleanupExpiredHourly(): void {
   const boundary = dayjs().subtract(HOURLY_RETENTION_DAYS, 'day').format('YYYY-MM-DDTHH')
   db().delete(usageHourly).where(lte(usageHourly.hourKey, boundary)).run()
 }

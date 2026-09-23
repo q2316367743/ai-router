@@ -5,6 +5,8 @@
  *   注意不能在 mac 上同时 `setContextMenu`，否则左键会被菜单吞掉。
  * - linux：多数桌面环境的托盘只支持菜单（无 click 事件），保留 setContextMenu 并在菜单内提供「打开统计面板」。
  * - darwin 在图标旁以标题实时显示今日 token 用量（K/M/E 缩写）；其他平台用量只进 tooltip。
+ * - 刷新时机：注册时刷一次 + 写库钩子即时刷；此后的兜底周期由 scheduler 域的 tray:usage 任务负责，
+ *   本文件不再自己上定时器。
  */
 import { Menu, Tray, app, nativeImage } from 'electron'
 import type { MenuItemConstructorOptions } from 'electron'
@@ -14,9 +16,6 @@ import { listUsageByRange } from '$/db/repo/usageRepo'
 import { todayKey } from '$/utils/date'
 import { showMainWindow } from './mainWindow'
 import { toggleTrayPanel } from './trayPanel'
-
-/** 兜底刷新周期：覆盖跨天归零与写库钩子遗漏的场景 */
-const REFRESH_INTERVAL = 30_000
 
 let tray: Tray | null = null
 
@@ -71,6 +70,6 @@ export function registerAppTray(): void {
     tray.on('right-click', () => tray?.popUpContextMenu(Menu.buildFromTemplate(menuTemplate())))
   }
 
+  // 立即刷一次，避免托盘标题等到首个兜底周期才有值
   refreshTrayUsage()
-  setInterval(refreshTrayUsage, REFRESH_INTERVAL)
 }

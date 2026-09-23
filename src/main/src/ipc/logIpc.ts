@@ -1,13 +1,11 @@
 import { BrowserWindow, ipcMain } from 'electron'
 import type { LogListQuery, LogStatusFilter } from '@common/types'
 import {
-  cleanupExpiredLogs,
   clearAllLogs,
   getLogDetail,
   getTodayStats,
   listFilterOptions,
   listLogs,
-  markPendingInterrupted,
   onLogWritten
 } from '$/db/repo/logRepo'
 
@@ -39,12 +37,6 @@ function scheduleBroadcast(): void {
       if (!win.isDestroyed()) win.webContents.send(CHANGED_CHANNEL)
     }
   }, BROADCAST_THROTTLE_MS)
-}
-
-/** 启动时收口残留的进行中日志（应用退出 / 崩溃时未回填的行，标记为 499 服务中断）并清理超窗日志 */
-export function cleanupLogsOnStartup(): void {
-  markPendingInterrupted()
-  cleanupExpiredLogs()
 }
 
 /** 入参归一化：非法值一律回退默认（全部 / 不筛选 / 第 1 页 / 每页 25 条） */

@@ -1472,12 +1472,7 @@
     "@types/http-errors" "*"
     "@types/node" "*"
 
-"@types/sortablejs@^1.15.1":
-  version "1.15.9"
-  resolved "https://registry.npmmirror.com/@types/sortablejs/-/sortablejs-1.15.9.tgz"
-  integrity sha512-7HP+rZGE2p886PKV9c9OJzLBI6BBJu1O7lJGYnPyG3fS4/duUCcngkNCjsLwIMV+WMqANe3tt4irrXHSIe68OQ==
-
-"@types/sortablejs@^1.15.9":
+"@types/sortablejs@^1.15.1", "@types/sortablejs@^1.15.9":
   version "1.15.9"
   resolved "https://registry.npmmirror.com/@types/sortablejs/-/sortablejs-1.15.9.tgz#82d2337f54d4db827914d80dee5cf65539ae3c8b"
   integrity sha512-7HP+rZGE2p886PKV9c9OJzLBI6BBJu1O7lJGYnPyG3fS4/duUCcngkNCjsLwIMV+WMqANe3tt4irrXHSIe68OQ==
@@ -2584,6 +2579,11 @@ core-util-is@~1.0.0:
   version "1.0.3"
   resolved "https://registry.npmmirror.com/core-util-is/-/core-util-is-1.0.3.tgz"
   integrity sha512-ZQBvi1DcpJ4GDqanjucZ2Hj3wEO5pZDS89BWbkcrvdxksJorwUDDZamX9ldFkp9aw2lmBDLgkObEA4DWNJ9FYQ==
+
+croner@^10.0.1:
+  version "10.0.1"
+  resolved "https://registry.npmmirror.com/croner/-/croner-10.0.1.tgz#4eb92806c99539146dbe2f3ee3907e319cb2847a"
+  integrity sha512-ixNtAJndqh173VQ4KodSdJEI6nuioBWI0V1ITNKhZZsO0pEMoDxz539T4FTTbSZ/xIOSuDnzxLVRqBVSvPNE2g==
 
 cross-spawn@^7.0.1, cross-spawn@^7.0.6:
   version "7.0.6"

@@ -1,7 +1,7 @@
 import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 /**
- * 请求详细日志：保留最近 7 天，logRepo 惰性清理（DELETE log_date < 窗口边界日）。
+ * 请求详细日志：保留最近 7 天，由 scheduler 的 log:retention 任务每日清理（DELETE log_date < 窗口边界日）。
  *
  * 两阶段落库：请求进入转发前先 startLog 落一行 pending（finished_at / status / duration_ms 为 null），
  * 响应结束后 recordLog 以 request_id 为键回填。null 即「进行中」，不用哨兵值以免污染筛选口径。

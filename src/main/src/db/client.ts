@@ -16,6 +16,8 @@ import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
 import * as schema from './schema'
 
 let instance: BetterSQLite3Database<typeof schema> | null = null
+/** 原始 better-sqlite3 句柄：WAL 维护等 pragma 需要它（drizzle 只暴露查询接口） */
+let raw: InstanceType<typeof Database> | null = null
 
 /**
  * 迁移目录运行时绝对路径。
@@ -34,6 +36,7 @@ export function initDb(): BetterSQLite3Database<typeof schema> {
   const sqlite = new Database(join(dir, 'ai-router.db'))
   sqlite.pragma('journal_mode = WAL')
   sqlite.pragma('foreign_keys = ON')
+  raw = sqlite
   const db = drizzle(sqlite, { schema })
   // 迁移由 `npx drizzle-kit generate` 产出；迁移目录尚未生成（未定义任何表）时跳过
   if (existsSync(join(migrationsDir(), 'meta', '_journal.json'))) {
@@ -47,4 +50,25 @@ export function initDb(): BetterSQLite3Database<typeof schema> {
 export function db(): BetterSQLite3Database<typeof schema> {
   if (!instance) throw new Error('[db] initDb() 未调用')
   return instance
+}
+
+/**
+ * 手动 WAL checkpoint（TRUNCATE）：把 WAL 内容写回主库并截断 wal 文件，由每日定时任务调用。
+ *
+ * 被未结束的读事务占住时 SQLite 返回 `busy` 而不是抛错，此时本轮跳过、不重试，等下一次触发。
+ */
+export function checkpointWal(): void {
+  if (!raw) throw new Error('[db] initDb() 未调用')
+  const row: unknown = raw.prepare('PRAGMA wal_checkpoint(TRUNCATE)').get()
+  if (typeof row !== 'object' || row === null || !('busy' in row) || !('checkpointed' in row)) {
+    console.log('[db] WAL checkpoint 已完成（无结果行）')
+    return
+  }
+  if (typeof row.busy === 'number' && row.busy !== 0) {
+    console.warn('[db] WAL checkpoint 被占用（存在未结束的读事务），本轮跳过')
+    return
+  }
+  console.log(
+    `[db] WAL checkpoint 已完成：写回 ${typeof row.checkpointed === 'number' ? row.checkpointed : 0} 页`
+  )
 }

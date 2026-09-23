@@ -1,4 +1,17 @@
-import { and, between, desc, eq, gt, inArray, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm'
+import {
+  and,
+  between,
+  desc,
+  eq,
+  gt,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  lte,
+  or,
+  sql
+} from 'drizzle-orm'
 import type {
   LogFilterOptions,
   LogListQuery,
@@ -84,8 +97,6 @@ const listColumns = {
   error: requestLogs.error
 }
 
-/** 最近一次执行过期清理的日期键：把「每请求一次 DELETE」降为「每天一次」 */
-let lastCleanupDate: string | null = null
 /** 正文清扫游标（按 id 递增推进）：本进程内有效，重启后从最小 id 重新走一遍 */
 let bodySweepCursor = 0
 /** 清扫进行中标记：避免同一次清扫并发跑两遍 */
@@ -97,7 +108,6 @@ let bodySweeping = false
  */
 export function startLog(entry: RequestLogStart): void {
   try {
-    cleanupExpiredLogs()
     db()
       .insert(requestLogs)
       .values({
@@ -129,7 +139,6 @@ export function startLog(entry: RequestLogStart): void {
  * 同步拦截分支（401/400/404 等，未走 startLog）无匹配行时直接插入，与单阶段写入等价。
  */
 export function recordLog(entry: RequestLogEntry): void {
-  cleanupExpiredLogs()
   const { requestId, startedAt, ...rest } = entry
   db()
     .insert(requestLogs)
@@ -139,16 +148,17 @@ export function recordLog(entry: RequestLogEntry): void {
   notifyWritten()
 }
 
-/** 清理超出保留窗口（RETENTION_DAYS 天前）的日志；按天节流，同一天内重复调用直接返回 */
-export function cleanupExpiredLogs(): void {
-  const today = todayKey()
-  if (lastCleanupDate === today) return
-  lastCleanupDate = today
+/**
+ * 清理超出保留窗口（RETENTION_DAYS 天前）的日志行，随后等正文清扫跑完。
+ *
+ * 由 scheduler 域的 log:retention 任务每日调用（启动时补跑一次），不再挂在写日志路径上——
+ * 写路径清理的频率实际由流量决定，空闲的日志库反而永远不清理。
+ * 返回的 Promise 在正文清扫结束时 resolve，调度侧据此判定本轮是否结束（防重叠触发靠它）。
+ */
+export async function cleanupExpiredLogs(): Promise<void> {
   const boundary = dateKey(Date.now() - (RETENTION_DAYS - 1) * 24 * 60 * 60 * 1000)
   db().delete(requestLogs).where(lt(requestLogs.logDate, boundary)).run()
-  void sweepExpiredBodies().catch((err: unknown) => {
-    console.error('[log] 过期正文清扫失败:', err)
-  })
+  await sweepExpiredBodies()
 }
 
 /**
@@ -230,7 +240,10 @@ function listWhere(query: LogListQuery) {
   return and(
     query.status === 'success' ? between(requestLogs.status, 200, 299) : undefined,
     query.status === 'fail'
-      ? and(isNotNull(requestLogs.status), or(lt(requestLogs.status, 200), gt(requestLogs.status, 299)))
+      ? and(
+          isNotNull(requestLogs.status),
+          or(lt(requestLogs.status, 200), gt(requestLogs.status, 299))
+        )
       : undefined,
     query.provider ? eq(requestLogs.providerName, query.provider) : undefined,
     query.model ? eq(requestLogs.publicModel, query.model) : undefined,

@@ -4,10 +4,10 @@ import { isOpenedAtLogin } from '$/app/autoLaunch'
 import { createMainWindow, showMainWindow } from '$/app/mainWindow'
 import { registerAppTray } from '$/app/tray'
 import { initDb } from '$/db/client'
-import { cleanupLogsOnStartup } from '$/ipc/logIpc'
-import { startQuotaScheduler } from '$/quota/scheduler'
+import { initQuota } from '$/quota/service'
 import { registerIpc } from '$/registerIpc'
 import { ensureServiceDefaults } from '$/db/repo/settingRepo'
+import { startSchedulers, stopSchedulers } from '$/scheduler'
 import { startProxyServer, stopProxyServer } from '$/server'
 
 // 单实例锁：二次拉起直接退出
@@ -31,18 +31,21 @@ if (hasSingleInstanceLock) {
     // 打开并迁移数据库（~/.ai-router/db/ai-router.db）
     initDb()
 
-    // 服务默认配置 + 清理残留历史日志
+    // 服务默认配置
     ensureServiceDefaults()
-    cleanupLogsOnStartup()
 
     // 启动本地代理服务（未启用时仅更新状态）
     await startProxyServer()
 
-    // 余量查询：注册策略 + 定时刷新（绑定了余量策略的提供商）
-    startQuotaScheduler()
+    // 余量查询：装载内置 + 外置策略（刷新节奏交给 scheduler 的 quota:refresh 任务）
+    initQuota()
 
     // 注册系统托盘（macOS 标题实时显示今日用量）
     registerAppTray()
+
+    // 定时任务：启动收口 + 日志/用量清理 + WAL 维护 + 余量刷新 + 托盘兜底刷新
+    // 须在 initDb 与 registerAppTray 之后：任务要与数据库和托盘就位
+    startSchedulers()
 
     if (isOpenedAtLogin()) {
       // 开机自启：静默驻留托盘，仅代理服务后台运行；macOS 同步隐藏 Dock
@@ -62,6 +65,7 @@ if (hasSingleInstanceLock) {
   })
 
   app.on('will-quit', () => {
+    stopSchedulers()
     stopProxyServer()
   })
 
