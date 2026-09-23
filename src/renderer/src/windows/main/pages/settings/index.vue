@@ -32,6 +32,16 @@
         <TrayQuotaEditor />
       </div>
 
+      <!-- 负载均衡 -->
+      <div class="card mt-12px">
+        <div class="font-500">负载均衡</div>
+        <div class="text-13px text-td-secondary mt-4px mb-12px">
+          同一对外模型名下的多个渠道互为故障转移候选：按可用度分流、失败逐步降级、额度耗尽直接切断、
+          同一会话固定同一渠道；改动立即生效
+        </div>
+        <BalancerEditor />
+      </div>
+
       <!-- 启动 -->
       <div class="card mt-12px">
         <div class="flex items-center justify-between gap-16px">
@@ -79,6 +89,7 @@
 <script lang="ts" setup>
 import { onMounted, ref, computed } from 'vue'
 import PageLayout from '@/components/PageLayout/PageLayout.vue'
+import BalancerEditor from './components/BalancerEditor.vue'
 import DashboardLayoutEditor from './components/DashboardLayoutEditor.vue'
 import TrayQuotaEditor from './components/TrayQuotaEditor.vue'
 import { useColorMode } from '@/hooks/colorMode'

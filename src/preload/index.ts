@@ -1,6 +1,7 @@
 import { contextBridge } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import { appApi } from '~/modules/app/app'
+import { balancerApi } from '~/modules/balancer/balancer'
 import { dbApi } from '~/modules/db/db'
 import { providerApi } from '~/modules/provider/provider'
 import { modelApi } from '~/modules/model/model'
@@ -25,6 +26,7 @@ const preload = {
   usage: usageApi,
   quota: quotaApi,
   quotaPlugin: quotaPluginApi,
+  balancer: balancerApi,
   tray: trayApi
 }
 

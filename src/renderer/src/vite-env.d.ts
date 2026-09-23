@@ -2,11 +2,15 @@
 import type { ElectronAPI } from '@electron-toolkit/preload'
 import type {
   AutoLaunchState,
+  ChannelHealthInfo,
   LogFilterOptions,
   LogListQuery,
   LogListResult,
+  ModelChannelInput,
+  ModelChannelPatch,
+  ModelGroupEnabledInput,
+  ModelGroupRenameInput,
   ModelMappingInfo,
-  ModelMappingInput,
   ProviderInfo,
   ProviderInput,
   ProviderQuotaInfo,
@@ -53,12 +57,22 @@ declare global {
       }
       model: {
         list(): Promise<ModelMappingInfo[]>
-        create(input: ModelMappingInput): Promise<string>
-        update(input: ModelMappingInput): Promise<void>
-        /** 归档（假删除）：对外名所有权保留，对外列表与请求路由随即不可见 */
+        /** 新增渠道：对外名首次出现即「新建对外模型」，同名再建即「在该名下加渠道」 */
+        create(input: ModelChannelInput): Promise<string>
+        /** 编辑渠道：对外名不属于渠道，改名走 groupRename */
+        update(input: ModelChannelPatch): Promise<void>
+        /** 归档渠道（假删除）：该 (对外名, 提供商) 组合的所有权保留 */
         archive(id: string): Promise<void>
-        /** 恢复：所属提供商仍归档时该映射依旧不可用，需先恢复提供商 */
+        /** 恢复渠道：所属提供商仍归档时该渠道依旧不可用，需先恢复提供商 */
         restore(id: string): Promise<void>
+        /** 组级重命名：一次改该名下全部渠道，并改写历史统计与日志 */
+        groupRename(input: ModelGroupRenameInput): Promise<void>
+        /** 组级启停：一次改该名下全部未归档渠道 */
+        groupEnabled(input: ModelGroupEnabledInput): Promise<void>
+        /** 组级归档：对外名整体下线（请求返回 404 model_archived） */
+        groupArchive(publicName: string): Promise<void>
+        /** 组级恢复：一次恢复该名下全部渠道 */
+        groupRestore(publicName: string): Promise<void>
       }
       service: {
         getConfig(): Promise<ServiceConfig>
@@ -121,6 +135,12 @@ declare global {
         update(input: QuotaPluginInput): Promise<void>
         /** 归档（假删除）：连带解绑引用它的提供商 */
         archive(id: string): Promise<void>
+      }
+      balancer: {
+        /** 全部未归档提供商的健康快照（可用度 / 状态 / 最近失败 / 额度阻断原因） */
+        states(): Promise<ChannelHealthInfo[]>
+        /** 手动重置：可用度拉回满值并解除额度阻断 */
+        reset(providerId: string): Promise<void>
       }
       tray: {
         /** 收起托盘统计面板 */

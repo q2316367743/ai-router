@@ -1,175 +1,129 @@
 import type { Readable } from 'node:stream'
-import type { AxiosResponse } from 'axios'
 import {
-  recordRequest,
   serializeOutboundHeaders,
   serializeResponseHeaders,
-  startRequest,
-  type TokenUsage
+  startRequest
 } from '../logging/requestLog'
-import { errMsg } from '../respond'
 import { collectExtraHeaders } from '../upstream/forwardHeaders'
 import { joinEndpoint, upstreamPathOf } from '../upstream/urls'
-import { getUpstreamClient, responseHeadersOf } from '../upstream/httpClient'
+import { postUpstreamStream, responseHeadersOf } from '../upstream/httpClient'
+import { classifyFailure } from '../balancer/classify'
 import { captureResponseText, createWireCapture, type WireCapture } from './wireCapture'
 import { createSseParser } from './sse'
-import { toTokenUsage, type ApiUsage, type Conversation } from './conversation'
-import type { ProtocolStrategy, RequestContext } from './types'
-
-interface ConversionOutcome {
-  status: number
-  stream: boolean
-  usage: TokenUsage | null
-  errorSnippet: string | null
-  /** 本地生成的响应正文（拦截分支的协议错误 JSON）；有上游响应时日志取线上捕获 */
-  localResBody: string | null
-}
+import type { ApiUsage, Conversation } from './conversation'
+import type { AttemptOutcome, ProtocolStrategy, RequestContext } from './types'
 
 /**
  * 异协议转发：入口协议解析为统一会话 → 上游协议构建报文 → axios 直连 →
  * 上游解码为统一事件/结果 → 入口协议编码回写。日志为线上口径：
  * 请求侧记上游构建的报文，响应侧记提供商原始返回。非流式为真·非流式上游请求。
+ *
+ * **提交时机**（决定能否改道）：入口编码器的响应头是惰性的（首次写事件才写头），
+ * 因此上游非 2xx 与流内首 token 前的失败都还没向客户端写过字节，交给改道循环处置。
+ * 会话解析在循环外只做一次（多协议候选下解析结果与渠道无关）。
  */
 export async function converted(
   ctx: RequestContext,
   entry: ProtocolStrategy,
-  upstream: ProtocolStrategy
-): Promise<void> {
-  const { req, body, res, route, publicModel, requestId, client, startedAt } = ctx
+  upstream: ProtocolStrategy,
+  conversation: Conversation
+): Promise<AttemptOutcome> {
+  const { req, res, route, publicModel, requestId, client, startedAt, controller } = ctx
+  const signal = controller.signal
   // 日志 path 记上游实际请求路径（而非客户端入口路径）
   const logPath = upstreamPathOf(joinEndpoint(route.providerBaseUrl, upstream.upstreamPath))
   const capture = createWireCapture()
-  const finish = (outcome: ConversionOutcome): void => {
-    recordRequest({
-      path: logPath,
+  const wire = (): AttemptOutcome['wire'] => ({
+    body: capture.requestBody,
+    headers: capture.requestHeaders
+  })
+
+  const wireRequest = upstream.buildRequest(conversation, route, collectExtraHeaders(req))
+  capture.requestBody = JSON.stringify(wireRequest.body)
+  capture.requestHeaders = serializeOutboundHeaders(wireRequest.headers)
+
+  // 转发前先落 pending 日志（日志页即时可见「进行中」）；stream 按原始 body 预判
+  if (ctx.firstAttempt) {
+    startRequest({
       requestId,
+      startedAt,
       publicModel,
       providerName: route.providerName,
       upstreamModel: route.upstreamName,
       providerId: route.providerId,
       modelId: route.modelId,
       client,
-      startedAt,
-      status: outcome.status,
-      stream: outcome.stream,
-      usage: outcome.usage,
-      error: outcome.errorSnippet,
-      reqBody: capture.requestBody,
-      reqHeaders: capture.requestHeaders,
-      resBody: capture.responseBody ?? outcome.localResBody,
+      path: logPath,
+      stream: conversation.stream
+    })
+  }
+
+  const call = await postUpstreamStream(
+    wireRequest.url,
+    capture.requestBody,
+    wireRequest.headers,
+    signal
+  )
+  if (!call.ok) {
+    if (call.reason === 'aborted') {
+      return uncommitted({
+        kind: 'client',
+        status: 499,
+        wire: wire(),
+        path: logPath,
+        stream: conversation.stream,
+        message: 'client aborted',
+        serve: null
+      })
+    }
+    const message = `Upstream request failed: ${call.message}`
+    return uncommitted({
+      kind: 'upstream',
+      status: 502,
+      wire: wire(),
+      path: logPath,
+      stream: conversation.stream,
+      message,
+      serve: () => entry.writeError(res, 502, message)
+    })
+  }
+
+  const upstreamRes = call.response
+  capture.responseHeaders = serializeResponseHeaders(responseHeadersOf(upstreamRes))
+
+  // 非 2xx：读全量错误体后不立即回写，交给改道循环（无可改道时按入口协议信封回放）
+  if (upstreamRes.status >= 400) {
+    const bodyText = await readAll(capture, upstreamRes.data, signal)
+    if (signal.aborted) {
+      return uncommitted({
+        kind: 'client',
+        status: 499,
+        wire: wire(),
+        path: logPath,
+        stream: conversation.stream,
+        message: 'client aborted',
+        serve: null
+      })
+    }
+    const message = summarizeUpstreamError(upstreamRes.status, bodyText)
+    return uncommitted({
+      kind: classifyFailure(upstreamRes.status, bodyText),
+      status: upstreamRes.status,
+      upstreamStatus: upstreamRes.status,
+      wire: wire(),
+      path: logPath,
+      stream: conversation.stream,
+      message,
+      serve: () => entry.writeError(res, upstreamRes.status, message),
+      resBody: capture.responseBody,
       resHeaders: capture.responseHeaders
     })
   }
 
-  // 转发前先落 pending 日志（日志页即时可见「进行中」）；stream 按原始 body 预判，与解析成败无关
-  startRequest({
-    requestId,
-    startedAt,
-    publicModel,
-    providerName: route.providerName,
-    upstreamModel: route.upstreamName,
-    providerId: route.providerId,
-    modelId: route.modelId,
-    client,
-    path: logPath,
-    stream: body['stream'] === true
-  })
-
-  let conversation: Conversation
-  try {
-    conversation = entry.parseRequest(body)
-  } catch (err) {
-    const message = errMsg(err)
-    const localResBody = entry.writeError(res, 400, message)
-    finish({ status: 400, stream: false, usage: null, errorSnippet: message, localResBody })
-    return
-  }
-
-  const wire = upstream.buildRequest(conversation, route, collectExtraHeaders(req))
-  capture.requestBody = JSON.stringify(wire.body)
-  capture.requestHeaders = serializeOutboundHeaders(wire.headers)
-
-  const controller = new AbortController()
-  res.on('close', () => {
-    if (!res.writableEnded) controller.abort()
-  })
-
-  // validateStatus 全放行：非 2xx 也由下方统一处理（错误正文同样入库）
-  let upstreamRes: AxiosResponse<Readable>
-  try {
-    upstreamRes = await getUpstreamClient().post<Readable>(wire.url, capture.requestBody, {
-      headers: wire.headers,
-      responseType: 'stream',
-      validateStatus: () => true,
-      signal: controller.signal
-    })
-  } catch (err) {
-    // signal 被 abort 只源于客户端断开：不回写，记 499（与透传路径一致）
-    if (controller.signal.aborted) {
-      res.destroy()
-      finish({
-        status: 499,
-        stream: conversation.stream,
-        usage: null,
-        errorSnippet: 'client aborted',
-        localResBody: null
-      })
-      return
-    }
-    // 网络层错误 message 已被 httpClient 拦截器增强（错误码 + 底层原因 + 中文提示）
-    const message = `Upstream request failed: ${errMsg(err)}`
-    const localResBody = entry.writeError(res, 502, message)
-    finish({
-      status: 502,
-      stream: conversation.stream,
-      usage: null,
-      errorSnippet: message,
-      localResBody
-    })
-    return
-  }
-
-  capture.responseHeaders = serializeResponseHeaders(responseHeadersOf(upstreamRes))
-
-  // 非 2xx：读全量错误体，按真实状态码 + 入口协议信封返回（流式与否一致）
-  if (upstreamRes.status >= 400) {
-    const bodyText = await readAll(capture, upstreamRes.data, controller.signal)
-    if (controller.signal.aborted) {
-      res.destroy()
-      finish({
-        status: 499,
-        stream: conversation.stream,
-        usage: null,
-        errorSnippet: 'client aborted',
-        localResBody: null
-      })
-      return
-    }
-    const message = summarizeUpstreamError(upstreamRes.status, bodyText)
-    entry.writeError(res, upstreamRes.status, message)
-    finish({
-      status: upstreamRes.status,
-      stream: conversation.stream,
-      usage: null,
-      errorSnippet: message,
-      localResBody: null
-    })
-    return
-  }
-
   if (!conversation.stream) {
-    await respondBuffered(
-      ctx,
-      entry,
-      upstream,
-      capture,
-      upstreamRes.data,
-      controller.signal,
-      finish
-    )
-    return
+    return respondBuffered(ctx, entry, upstream, capture, upstreamRes, signal, logPath)
   }
-  await respondStreamed(ctx, entry, upstream, capture, upstreamRes.data, controller.signal, finish)
+  return respondStreamed(ctx, entry, upstream, capture, upstreamRes, signal, logPath)
 }
 
 /** 非流式：读全量 JSON → 上游解码为统一结果 → 入口编码一次性回写 */
@@ -178,40 +132,56 @@ async function respondBuffered(
   entry: ProtocolStrategy,
   upstream: ProtocolStrategy,
   capture: WireCapture,
-  upstreamData: Readable,
+  upstreamRes: { status: number; data: Readable },
   signal: AbortSignal,
-  finish: (outcome: ConversionOutcome) => void
-): Promise<void> {
-  const bodyText = await readAll(capture, upstreamData, signal)
+  logPath: string
+): Promise<AttemptOutcome> {
+  const bodyText = await readAll(capture, upstreamRes.data, signal)
+  const wire = { body: capture.requestBody, headers: capture.requestHeaders }
   if (signal.aborted) {
-    ctx.res.destroy()
-    finish({
+    return uncommitted({
+      kind: 'client',
       status: 499,
+      wire,
+      path: logPath,
       stream: false,
-      usage: null,
-      errorSnippet: 'client aborted',
-      localResBody: null
+      message: 'client aborted',
+      serve: null
     })
-    return
   }
   let payload: unknown
   try {
     payload = JSON.parse(bodyText)
   } catch {
     const message = 'Upstream returned a non-JSON response'
-    entry.writeError(ctx.res, 502, message)
-    finish({ status: 502, stream: false, usage: null, errorSnippet: message, localResBody: null })
-    return
+    return uncommitted({
+      kind: 'upstream',
+      status: 502,
+      upstreamStatus: upstreamRes.status,
+      wire,
+      path: logPath,
+      stream: false,
+      message,
+      serve: () => entry.writeError(ctx.res, 502, message)
+    })
   }
   const completion = upstream.decodeResponse(payload)
-  const localResBody = entry.encodeCompletion(ctx.res, ctx.publicModel, completion)
-  finish({
-    status: 200,
+  const localBody = entry.encodeCompletion(ctx.res, ctx.publicModel, completion)
+  return {
+    kind: 'ok',
+    committed: localBody !== null,
+    status: upstreamRes.status,
+    upstreamStatus: upstreamRes.status,
     stream: false,
-    usage: completion.usage ? toTokenUsage(completion.usage) : null,
-    errorSnippet: null,
-    localResBody
-  })
+    path: logPath,
+    usage: completion.usage,
+    wire,
+    // 线上口径：日志记提供商原始返回；本地生成的正文仅在上游无响应时兜底
+    resBody: capture.responseBody ?? localBody,
+    resHeaders: capture.responseHeaders,
+    message: null,
+    serve: null
+  }
 }
 
 /** 流式：上游解码 → 统一事件 → 入口编码回写（惰性响应头，可中途改道协议错误信封） */
@@ -220,10 +190,11 @@ async function respondStreamed(
   entry: ProtocolStrategy,
   upstream: ProtocolStrategy,
   capture: WireCapture,
-  upstreamData: Readable,
+  upstreamRes: { status: number; data: Readable },
   signal: AbortSignal,
-  finish: (outcome: ConversionOutcome) => void
-): Promise<void> {
+  logPath: string
+): Promise<AttemptOutcome> {
+  const wire = { body: capture.requestBody, headers: capture.requestHeaders }
   const encoder = entry.createEntryEncoder(ctx.res, ctx.publicModel)
   let usage: ApiUsage | null = null
   const decoder = upstream.createUpstreamDecoder(async (event) => {
@@ -233,14 +204,14 @@ async function respondStreamed(
   const parser = createSseParser()
   const sse = new TextDecoder()
 
-  // 客户端断开（res close → abort）时销毁上游连接，读取循环随之终止
+  // 客户端断开（signal abort）时销毁上游连接，读取循环随之终止
   const onAbort = (): void => {
-    upstreamData.destroy()
+    upstreamRes.data.destroy()
   }
   signal.addEventListener('abort', onAbort, { once: true })
 
   try {
-    for await (const chunk of readChunks(upstreamData)) {
+    for await (const chunk of readChunks(upstreamRes.data)) {
       const text = sse.decode(chunk, { stream: true })
       captureResponseText(capture, text)
       for (const event of parser.feed(text)) {
@@ -258,59 +229,153 @@ async function respondStreamed(
     signal.removeEventListener('abort', onAbort)
   }
   // 终态后上游可能还有残余字节，提前释放连接
-  if (decoder.done && !upstreamData.destroyed) upstreamData.destroy()
+  if (decoder.done && !upstreamRes.data.destroyed) upstreamRes.data.destroy()
 
   if (signal.aborted) {
-    ctx.res.destroy()
-    finish({
+    return settle({
+      kind: 'client',
       status: 499,
+      upstreamStatus: null,
+      wire,
+      path: logPath,
+      capture,
       stream: true,
       usage: null,
-      errorSnippet: 'client aborted',
-      localResBody: null
+      message: 'client aborted',
+      committed: encoder.headWritten
     })
-    return
   }
 
   const failure = decoder.failure
   if (failure) {
-    if (encoder.headWritten) {
-      await encoder.writeError(failure.message)
-      encoder.end()
-    } else {
-      entry.writeError(ctx.res, failure.status, failure.message)
+    if (!encoder.headWritten) {
+      return uncommitted({
+        kind: 'upstream',
+        status: failure.status,
+        upstreamStatus: upstreamRes.status,
+        wire,
+        path: logPath,
+        stream: true,
+        message: failure.message,
+        serve: () => entry.writeError(ctx.res, failure.status, failure.message)
+      })
     }
-    finish({
+    await encoder.writeError(failure.message)
+    encoder.end()
+    return settle({
+      kind: 'upstream',
       status: failure.status,
+      upstreamStatus: upstreamRes.status,
+      wire,
+      path: logPath,
+      capture,
       stream: true,
       usage: null,
-      errorSnippet: failure.message,
-      localResBody: null
+      message: failure.message
     })
-    return
   }
 
   if (!decoder.completed) {
     // 上游流在终态事件前中断（连接提前关闭）
     const message = 'Upstream stream ended unexpectedly'
-    if (encoder.headWritten) {
-      await encoder.writeError(message)
-      encoder.end()
-    } else {
-      entry.writeError(ctx.res, 502, message)
+    if (!encoder.headWritten) {
+      return uncommitted({
+        kind: 'upstream',
+        status: 502,
+        upstreamStatus: upstreamRes.status,
+        wire,
+        path: logPath,
+        stream: true,
+        message,
+        serve: () => entry.writeError(ctx.res, 502, message)
+      })
     }
-    finish({ status: 502, stream: true, usage: null, errorSnippet: message, localResBody: null })
-    return
+    await encoder.writeError(message)
+    encoder.end()
+    return settle({
+      kind: 'upstream',
+      status: 502,
+      upstreamStatus: upstreamRes.status,
+      wire,
+      path: logPath,
+      capture,
+      stream: true,
+      usage,
+      message
+    })
   }
 
   encoder.end()
-  finish({
-    status: 200,
+  return settle({
+    kind: 'ok',
+    status: upstreamRes.status,
+    upstreamStatus: upstreamRes.status,
+    wire,
+    path: logPath,
+    capture,
     stream: true,
-    usage: usage ? toTokenUsage(usage) : null,
-    errorSnippet: null,
-    localResBody: null
+    usage,
+    message: null
   })
+}
+
+/** 已提交结果（响应已向客户端写出，不可再改道） */
+function settle(args: {
+  kind: AttemptOutcome['kind']
+  status: number
+  upstreamStatus: number | null
+  wire: AttemptOutcome['wire']
+  path: string
+  capture: WireCapture
+  stream: boolean
+  usage: ApiUsage | null
+  message: string | null
+  /** 客户端断开等场景下可能尚未写头，此时仍算未提交 */
+  committed?: boolean
+}): AttemptOutcome {
+  return {
+    kind: args.kind,
+    committed: args.committed ?? true,
+    status: args.status,
+    upstreamStatus: args.upstreamStatus,
+    stream: args.stream,
+    path: args.path,
+    usage: args.usage,
+    wire: args.wire,
+    resBody: args.capture.responseBody,
+    resHeaders: args.capture.responseHeaders,
+    message: args.message,
+    serve: null
+  }
+}
+
+/** 未提交失败：本次尝试没向客户端写过任何字节，可改道；`serve` 供最后回放 */
+function uncommitted(args: {
+  kind: AttemptOutcome['kind']
+  status: number
+  wire: AttemptOutcome['wire']
+  path: string
+  stream: boolean
+  message: string
+  serve: (() => string | null) | null
+  upstreamStatus?: number | null
+  resBody?: string | null
+  resHeaders?: string | null
+}): AttemptOutcome {
+  return {
+    kind: args.kind,
+    committed: false,
+    status: args.status,
+    upstreamStatus: args.upstreamStatus ?? null,
+    stream: args.stream,
+    path: args.path,
+    usage: null,
+    wire: args.wire,
+    resBody: args.resBody ?? null,
+    resHeaders: args.resHeaders ?? null,
+    message: args.message,
+    serve: args.serve
+  }
 }
 
 /** 上游错误响应 → 客户端与日志共用的消息：状态码 + 正文前 300 字摘要 */

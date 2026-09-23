@@ -39,6 +39,25 @@ export interface RequestLogDetail extends RequestLogItem {
   requestHeaders: string | null
   responseBody: string | null
   responseHeaders: string | null
+  /** 渠道重试轨迹（`RetryAttempt[]` 的 JSON 文本）：无改道时为 null */
+  retryTrace: string | null
+}
+
+/**
+ * 一次未提交即失败、被改道到下一渠道的尝试。
+ *
+ * 只在「尚未向客户端写出任何字节」时才有改道，因此成功的改道对客户端完全不可见；
+ * 这些尝试不单独落日志行，而是挂在最终那一条日志的 retryTrace 上。
+ */
+export interface RetryAttempt {
+  /** 提供商名称（失败发生时的渠道） */
+  provider: string
+  /** 上游状态码；null = 网络层错误（未拿到响应） */
+  status: number | null
+  /** 失败摘要（上游错误正文片段或错误码 + 中文提示） */
+  error: string
+  /** 该次尝试的时刻（epoch ms） */
+  at: number
 }
 
 /** 今日汇总统计（概览页） */

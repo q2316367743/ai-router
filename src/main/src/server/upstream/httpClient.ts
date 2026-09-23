@@ -1,12 +1,16 @@
+import type { Readable } from 'node:stream'
 import axios, {
   AxiosError,
   type AxiosInstance,
   type AxiosRequestConfig,
+  type AxiosResponse,
   type AxiosResponseHeaders,
   type RawAxiosResponseHeaders
 } from 'axios'
 import { HttpsProxyAgent } from 'https-proxy-agent'
 import { getServiceConfig } from '$/db/repo/settingRepo'
+import { FIRST_BYTE_TIMEOUT_MS } from '../balancer/config'
+import { errMsg } from '../respond'
 
 /** 常见网络错误码 → 中文原因说明（describeNetworkError 拼接用） */
 const NETWORK_HINTS: Readonly<Record<string, string>> = {
@@ -82,4 +86,63 @@ export function responseHeadersOf(res: {
     else headers.set(key, value)
   }
   return headers
+}
+
+/** 出站调用结果：拿到响应（含非 2xx，交调用方按业务处理）或失败原因 */
+export type UpstreamCall =
+  | { ok: true; response: AxiosResponse<Readable> }
+  | { ok: false; reason: 'aborted' | 'timeout' | 'network'; message: string }
+
+/**
+ * 向上游发起流式 POST（唯一出站入口）：统一处理首字节超时、客户端断开与网络错误。
+ *
+ * - `clientSignal` 由调用方持有（客户端断开时 abort），本函数**只监听不 abort 它**：
+ *   每次调用另建 attempt 级 controller，超时只中断这一次尝试；
+ *   拿请求级信号去 abort 会让整个请求永久处于「已断开」，后续改道全部立刻失败、
+ *   客户端拿不到任何响应（见 `strategies/forward.ts` 的尝试循环）；
+ * - **首字节超时**另挂独立计时器，拿到响应头即刻清除：axios 的 `timeout` 是 socket 空闲计时，
+ *   会在大模型「思考停顿」（长时间没有字节）时误杀长请求，所以不能直接用；
+ * - `validateStatus` 全放行：非 2xx 也是业务结果，由调用方读错误体后决定改道还是回写。
+ */
+export async function postUpstreamStream(
+  url: string,
+  body: string,
+  headers: Record<string, string>,
+  clientSignal: AbortSignal
+): Promise<UpstreamCall> {
+  const attempt = new AbortController()
+  // 客户端断开 → 中断本次尝试；调用时已断开则直接置位（对已 abort 的信号，监听器不会触发）
+  const onClientAbort = (): void => attempt.abort()
+  if (clientSignal.aborted) onClientAbort()
+  else clientSignal.addEventListener('abort', onClientAbort)
+
+  let firstByteTimedOut = false
+  const timer = setTimeout(() => {
+    firstByteTimedOut = true
+    attempt.abort()
+  }, FIRST_BYTE_TIMEOUT_MS)
+  try {
+    const response = await getUpstreamClient().post<Readable>(url, body, {
+      headers,
+      responseType: 'stream',
+      validateStatus: () => true,
+      signal: attempt.signal
+    })
+    return { ok: true, response }
+  } catch (err) {
+    if (firstByteTimedOut) {
+      return {
+        ok: false,
+        reason: 'timeout',
+        message: `上游 ${FIRST_BYTE_TIMEOUT_MS / 1000}s 内未返回响应`
+      }
+    }
+    // 未被超时中止却已 abort：只源于客户端断开
+    if (clientSignal.aborted) return { ok: false, reason: 'aborted', message: 'client aborted' }
+    // 网络层错误 message 已被拦截器增强（错误码 + 底层原因 + 中文提示）
+    return { ok: false, reason: 'network', message: errMsg(err) }
+  } finally {
+    clearTimeout(timer)
+    clientSignal.removeEventListener('abort', onClientAbort)
+  }
 }

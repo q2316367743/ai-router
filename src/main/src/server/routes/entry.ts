@@ -1,18 +1,20 @@
 import { randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { ProviderProtocol } from '@common/types'
-import { findMapping } from '$/db/repo/modelRepo'
+import { findRoutes } from '$/db/repo/modelRepo'
+import { getBalancerConfig, blockReasonOf, orderCandidates, sessionKeyOf } from '../balancer'
 import { parseClientName, recordRequest } from '../logging/requestLog'
 import { forwardRequest } from '../strategies/forward'
 import { strategyOf } from '../strategies/registry'
+import type { MappingRoute } from '$/db/repo/modelRepo'
 
 /** 经 express.json 解析后的请求：转发层只依赖 body，不引入框架类型 */
 type ProxyRequest = IncomingMessage & { body?: unknown }
 type HandleResult = (req: ProxyRequest, res: ServerResponse) => Promise<void>
 
 /**
- * 入口路由工厂：按入口协议生成「校验 body → 查映射 → 策略分发」处理器。
- * 路由内的同步拦截（400 / 404）一律以该入口协议的错误信封返回；
+ * 入口路由工厂：按入口协议生成「校验 body → 取该对外名的全部渠道 → 选路 → 转发」处理器。
+ * 路由内的同步拦截（400 / 404 / 503）一律以该入口协议的错误信封返回；
  * 全局拦截（401 / 413 / 未知路由）在 app.ts 中、协议路由之前，仍为 OpenAI 信封。
  */
 export function createEntryHandler(protocol: ProviderProtocol): HandleResult {
@@ -45,7 +47,8 @@ export function createEntryHandler(protocol: ProviderProtocol): HandleResult {
         reqBody: null,
         reqHeaders: null,
         resBody,
-        resHeaders: null
+        resHeaders: null,
+        retryTrace: null
       })
       return
     }
@@ -71,17 +74,23 @@ export function createEntryHandler(protocol: ProviderProtocol): HandleResult {
         reqBody: null,
         reqHeaders: null,
         resBody,
-        resHeaders: null
+        resHeaders: null,
+        retryTrace: null
       })
       return
     }
 
-    const route = findMapping(publicModel)
-    // 已归档（映射自身或所属提供商）与「不存在 / 已禁用」区分报错：归档是对客户端的正式下线
+    // 同一对外名的多行 = 一个渠道组（负载均衡候选集）
+    const routes = findRoutes(publicModel)
+    const usable = routes.filter(isUsable)
+    // 已归档（渠道自身或其提供商）与「不存在 / 已禁用」区分报错：归档是对客户端的正式下线
     // 宣告，明确告知；禁用仍沿用不区分口径的 404，不泄漏配置
-    const archived =
-      route !== null && (route.mappingArchivedAt !== null || route.providerArchivedAt !== null)
-    if (!route || archived || !route.mappingEnabled || !route.providerEnabled) {
+    if (usable.length === 0) {
+      const archived =
+        routes.length > 0 &&
+        routes.every(
+          (route) => route.mappingArchivedAt !== null || route.providerArchivedAt !== null
+        )
       const resBody = entry.writeError(
         res,
         404,
@@ -94,10 +103,10 @@ export function createEntryHandler(protocol: ProviderProtocol): HandleResult {
         path,
         requestId,
         publicModel,
-        providerName: route?.providerName ?? '-',
-        upstreamModel: route?.upstreamName ?? '-',
-        providerId: route?.providerId ?? null,
-        modelId: route?.modelId ?? null,
+        providerName: routes[0]?.providerName ?? '-',
+        upstreamModel: routes[0]?.upstreamName ?? '-',
+        providerId: routes[0]?.providerId ?? null,
+        modelId: routes[0]?.modelId ?? null,
         client,
         startedAt,
         status: 404,
@@ -107,17 +116,73 @@ export function createEntryHandler(protocol: ProviderProtocol): HandleResult {
         reqBody: null,
         reqHeaders: null,
         resBody,
-        resHeaders: null
+        resHeaders: null,
+        retryTrace: null
       })
       return
     }
 
-    // 入口协议 × 上游协议由转发层组合：同协议透传，异协议转换
+    const config = getBalancerConfig()
+    const sessionKey = config.sessionAffinity ? sessionKeyOf(req, parsed) : null
+    // 引擎关闭 = 单渠道直连（不选路、不拦额度、不改道），与改造前的行为一致
+    const attempts = config.enabled ? orderCandidates(usable, sessionKey, publicModel) : usable.slice(0, 1)
+
+    // 候选全部被额度阻断：直接拦截，不把请求送给已知没额度的渠道（这正是「等失败再降级」要避免的）
+    if (attempts.length === 0) {
+      const detail = usable
+        .map((route) => `${route.providerName}（${blockReasonOf(route.providerId) ?? '不可用'}）`)
+        .join('、')
+      const message = `All channels for model '${publicModel}' are unavailable: ${detail}`
+      const resBody = entry.writeError(res, 503, message, 'all_channels_unavailable')
+      recordRequest({
+        path,
+        requestId,
+        publicModel,
+        providerName: usable[0]?.providerName ?? '-',
+        upstreamModel: usable[0]?.upstreamName ?? '-',
+        providerId: usable[0]?.providerId ?? null,
+        modelId: usable[0]?.modelId ?? null,
+        client,
+        startedAt,
+        status: 503,
+        stream: false,
+        usage: null,
+        error: message,
+        reqBody: null,
+        reqHeaders: null,
+        resBody,
+        resHeaders: null,
+        retryTrace: null
+      })
+      return
+    }
+
     await forwardRequest(
-      { req, body: parsed, res, route, publicModel, requestId, client, startedAt },
+      {
+        req,
+        body: parsed,
+        res,
+        publicModel,
+        requestId,
+        client,
+        startedAt,
+        attempts,
+        sessionKey,
+        maxAttempts: config.enabled ? config.maxAttempts : 1
+      },
       entry.protocol
     )
   }
+}
+
+/** 该渠道此刻是否可被选为候选：渠道自身与提供商都启用且未归档 */
+function isUsable(route: MappingRoute): boolean {
+  return (
+    route.mappingEnabled &&
+    route.mappingArchivedAt === null &&
+    route.providerEnabled &&
+    route.providerArchivedAt === null
+  )
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

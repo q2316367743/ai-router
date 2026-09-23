@@ -50,6 +50,30 @@
           }}</t-descriptions-item>
         </t-descriptions>
 
+        <!-- 负载均衡改道：本请求在向客户端写出任何字节之前失败过的渠道（不额外占日志行） -->
+        <template v-if="retryTrace.length > 0">
+          <div class="font-500 mt-16px mb-8px">渠道重试轨迹</div>
+          <div class="retry-list">
+            <div
+              v-for="(item, index) in retryTrace"
+              :key="`${item.at}-${index}`"
+              class="retry-item"
+            >
+              <t-tag variant="outline" size="small">改道 {{ index + 1 }}</t-tag>
+              <span class="font-500">{{ item.provider }}</span>
+              <t-tag
+                v-if="item.status !== null"
+                :theme="statusTheme(item.status)"
+                variant="light"
+                size="small"
+              >
+                HTTP {{ item.status }}
+              </t-tag>
+              <span class="retry-error">{{ item.error }}</span>
+            </div>
+          </div>
+        </template>
+
         <!-- 正文已超保留期：行、标头与统计信息仍在，只有正文被 main 侧按窗口清空 -->
         <t-alert
           v-if="bodyExpired"
@@ -85,9 +109,15 @@
 
 <script lang="ts" setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import type { RequestLogDetail } from '@common/types'
+import type { RequestLogDetail, RetryAttempt } from '@common/types'
 import { LOG_BODY_RETENTION_HOURS } from '@common/constants'
-import { formatDuration, formatTokens, isPendingStatus, isSuccessStatus } from '@/utils/format'
+import {
+  formatDuration,
+  formatTokens,
+  isPendingStatus,
+  isSuccessStatus,
+  statusTheme
+} from '@/utils/format'
 import LogPayloadPanel from './LogPayloadPanel.vue'
 import CodeViewer from './CodeViewer.vue'
 
@@ -112,6 +142,25 @@ const bodyExpired = computed(
     !log.value.responseBody
 )
 
+/** 渠道重试轨迹：脏数据按空处理（与 quotaRepo.safeParseSnapshot 同风格，不让坏数据打断详情） */
+const retryTrace = computed<RetryAttempt[]>(() => parseRetryTrace(log.value?.retryTrace ?? null))
+
+function parseRetryTrace(raw: string | null): RetryAttempt[] {
+  if (!raw) return []
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed.filter(isRetryAttempt) : []
+  } catch {
+    return []
+  }
+}
+
+function isRetryAttempt(value: unknown): value is RetryAttempt {
+  if (typeof value !== 'object' || value === null) return false
+  const item = value as Partial<Record<keyof RetryAttempt, unknown>>
+  return typeof item.provider === 'string' && typeof item.error === 'string'
+}
+
 async function reload(): Promise<void> {
   loading.value = true
   try {
@@ -135,5 +184,31 @@ watch(
 <style lang="less" scoped>
 .mono {
   font-family: 'SF Mono', Menlo, Consolas, monospace;
+}
+
+.retry-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.retry-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--fluent-radius-card);
+  background-color: var(--td-bg-color-container);
+  border: 1px solid var(--fluent-border-subtle);
+}
+
+.retry-error {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--td-text-color-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

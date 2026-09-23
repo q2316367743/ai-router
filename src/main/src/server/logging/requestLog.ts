@@ -34,6 +34,8 @@ export interface ProxyLogEntry extends HistoryRef {
   resBody: string | null
   /** 响应标头（提供商响应头 JSON 文本；无上游响应时为 null） */
   resHeaders: string | null
+  /** 渠道重试轨迹（`RetryAttempt[]` 的 JSON 文本）：无改道时为 null */
+  retryTrace: string | null
 }
 
 /**
@@ -100,7 +102,8 @@ export function recordRequest(entry: ProxyLogEntry): void {
       requestHeaders: entry.reqHeaders,
       responseBody: entry.resBody,
       responseHeaders: entry.resHeaders,
-      error: entry.error
+      error: entry.error,
+      retryTrace: entry.retryTrace
     })
 
     accumulateUsage({

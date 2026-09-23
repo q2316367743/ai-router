@@ -99,7 +99,13 @@ export function applyProviderRename(
   rewriteLogs(runner, 'provider_name', 'provider_id', providerId, newName)
 }
 
-/** 模型对外名改名：两张聚合表 + 日志表 */
+/**
+ * 模型对外名改名：两张聚合表 + 日志表。
+ *
+ * 2026-09-23 起对外名是「同名渠道行的组」，改名等于该名下**每一行**各改一次
+ * （`modelRepo.renameModelGroup` 在同一事务里逐个 id 调用本函数）；
+ * 入参 `modelId` 是**渠道行** id，历史行按它圈定，行与行之间互不干扰。
+ */
 export function applyModelRename(
   runner: SqlRunner,
   modelId: string,
@@ -155,9 +161,12 @@ function rewriteAggregate(
      WHERE ${ident(idColumn)} = ${id} AND ${ident(changed)} = ${oldName}
   `)
   runner.run(sql`UPDATE ${TEMP_TABLE} SET ${ident(changed)} = ${newName}`)
+  // SELECT 后面必须跟一个恒真 WHERE：`INSERT ... SELECT` 直接接 ON CONFLICT 时，SQLite 会把 ON 当成
+  // join 的 ON 子句并在 prepare 阶段报语法错误（文档 "Parsing Ambiguity" 给的解法就是补一个 WHERE）
   runner.run(sql`
     INSERT INTO ${ident(table)} (${sql.raw(columnList)})
     SELECT ${sql.raw(columnList)} FROM ${TEMP_TABLE}
+     WHERE true
     ON CONFLICT (${sql.raw(conflictTarget)})
     DO UPDATE SET ${sql.raw(additions)}
   `)

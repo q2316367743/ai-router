@@ -62,7 +62,8 @@ export function createProxyApp(): Express {
       reqBody: null,
       reqHeaders: null,
       resBody,
-      resHeaders: null
+      resHeaders: null,
+      retryTrace: null
     })
   })
 

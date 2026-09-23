@@ -6,6 +6,7 @@ import type { ProviderQuotaInfo, QuotaStrategyInfo, QuotaStrategyMeta } from '@c
 import { parseQuotaConfig } from '@common/utils/quotaConfig'
 import { listProviders } from '$/db/repo/providerRepo'
 import { listQuotaPlugins, listQuotaSnapshots, saveQuotaResult } from '$/db/repo/quotaRepo'
+import { applyProviderQuota } from '$/server/balancer'
 import { registerBuiltinStrategies } from './builtin'
 import { describeError } from './runtime/failure'
 import {
@@ -122,6 +123,8 @@ export async function refreshProviderQuota(providerId?: string): Promise<void> {
           )
         )
         saveQuotaResult(provider.id, { snapshot, error: null })
+        // 同步给负载均衡引擎：额度耗尽的渠道即刻归零可用度，不必等请求失败才发现
+        applyProviderQuota(provider.id, snapshot)
         succeeded++
         console.log(
           `[quota] ${provider.name} ← ${strategy.meta.label} 刷新成功（${Date.now() - startedAt}ms）`

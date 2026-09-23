@@ -1,5 +1,6 @@
 import { registerDbIpc } from '$/db/dbIpc'
 import { registerAppIpc } from '$/ipc/appIpc'
+import { registerBalancerIpc } from '$/ipc/balancerIpc'
 import { registerLogIpc } from '$/ipc/logIpc'
 import { registerModelIpc } from '$/ipc/modelIpc'
 import { registerProviderIpc } from '$/ipc/providerIpc'
@@ -23,5 +24,6 @@ export function registerIpc(): void {
   registerLogIpc()
   registerUsageIpc()
   registerQuotaIpc()
+  registerBalancerIpc()
   registerTrayIpc()
 }

@@ -18,6 +18,7 @@ declare module 'vue' {
     ServiceStatusBar: typeof import('./src/components/service/ServiceStatusBar.vue')['default']
     TAlert: typeof import('tdesign-vue-next')['Alert']
     TAside: typeof import('tdesign-vue-next')['Aside']
+    TAutoComplete: typeof import('tdesign-vue-next')['AutoComplete']
     TBackTop: typeof import('tdesign-vue-next')['BackTop']
     TButton: typeof import('tdesign-vue-next')['Button']
     TCard: typeof import('tdesign-vue-next')['Card']

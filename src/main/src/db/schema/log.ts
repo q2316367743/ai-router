@@ -53,7 +53,13 @@ export const requestLogs = sqliteTable(
     responseBody: text('response_body'),
     /** 响应标头（JSON 文本，上游响应头，已剔除 set-cookie） */
     responseHeaders: text('response_headers'),
-    error: text('error')
+    error: text('error'),
+    /**
+     * 渠道重试轨迹（JSON 文本，`RetryAttempt[]`）：本次请求在提交响应之前失败、
+     * 被改道到下一渠道的尝试记录。无改道时为 null；改道不额外落日志行，
+     * 用量统计仍只按最终渠道记一次。
+     */
+    retryTrace: text('retry_trace')
   },
   (t) => [
     index('idx_request_logs_date').on(t.logDate),

@@ -9,6 +9,7 @@ import { registerIpc } from '$/registerIpc'
 import { ensureServiceDefaults } from '$/db/repo/settingRepo'
 import { startSchedulers, stopSchedulers } from '$/scheduler'
 import { startProxyServer, stopProxyServer } from '$/server'
+import { syncQuotaBlocks } from '$/server/balancer'
 
 // 单实例锁：二次拉起直接退出
 const hasSingleInstanceLock = app.requestSingleInstanceLock()
@@ -39,6 +40,9 @@ if (hasSingleInstanceLock) {
 
     // 余量查询：装载内置 + 外置策略（刷新节奏交给 scheduler 的 quota:refresh 任务）
     initQuota()
+
+    // 负载均衡：用落库的余量快照重建额度阻断（重启后「没钱了」的渠道不会先漏放几个请求）
+    syncQuotaBlocks()
 
     // 注册系统托盘（macOS 标题实时显示今日用量）
     registerAppTray()
