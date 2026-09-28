@@ -42,3 +42,4 @@ src/
 7. **深浅色**：UnoCSS `dark: 'class'`（html.dark）+ TDesign `theme-mode` 属性，统一经 `useAppStore().toggleTheme()` 切换。
 8. **dev 端口**：7744（mistrelle 为 7743，错开便于同开）。
 9. **脚手架引导**：首次初始化执行过 `npx electron-vite build` + `npx drizzle-kit generate`（空 schema 初始迁移）；日常开发按 AGENTS.md RL-07 只跑 typecheck。
+10. **图标直引**（2026-09-28，见 AGENTS.md RL-09）：禁止 `<t-icon name="add" />`，一律 `import { AddIcon } from 'tdesign-icons-vue-next'` + `<add-icon />`（组件名 = 图标 kebab 名 → PascalCase + `Icon`，先在 `tdesign-mcp-server` 的 `search-icon` 里确认图标存在）；数据驱动的动态图标传**组件**而非名字——`icon: Component` + `<component :is="icon" />`，二选一写 `:is="cond ? AIcon : BIcon"`。看板（`MetricCard` / `cardRegistry` / `useUsageCards`）、托盘额度卡、主窗口菜单表均已按此改造；`components.d.ts` 中不再注册 `TIcon`。
