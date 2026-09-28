@@ -2,7 +2,7 @@
   <UsageChartCard
     v-if="option"
     title="供应商 Tokens 趋势"
-    icon="chart-line"
+    :icon="ChartLineIcon"
     :option="option"
     :height="height"
   />
@@ -14,6 +14,7 @@
  * 仅小时粒度（今天 / 近 24 小时）展示，日粒度下折线过密；无数据时整卡不渲染。
  */
 import { computed } from 'vue'
+import { ChartLineIcon } from 'tdesign-icons-vue-next'
 import type { DashboardCardContext } from './cardTypes'
 import UsageChartCard from './UsageChartCard.vue'
 import { buildProviderTrendOption } from '@/components/EChart/options'

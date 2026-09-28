@@ -1,10 +1,10 @@
 <template>
   <div class="metric-card" :style="{ '--metric-value-size': `${valueSize}px` }">
     <div class="metric-head">
-      <t-icon v-if="icon" :name="icon" class="metric-icon" />
+      <component :is="icon" v-if="icon" class="metric-icon" />
       <span class="metric-label">{{ label }}</span>
       <t-tooltip v-if="hint" :content="hint" placement="top-right">
-        <t-icon name="help-circle" class="metric-hint" />
+        <help-circle-icon class="metric-hint" />
       </t-tooltip>
       <t-tag
         v-if="pillText"
@@ -41,11 +41,14 @@
  *
  * 数值字号经 --metric-value-size 下传，避免为每个尺寸新建一个变体类。
  */
+import type { Component } from 'vue'
+import { HelpCircleIcon } from 'tdesign-icons-vue-next'
+
 withDefaults(
   defineProps<{
     label: string
-    /** tdesign 图标名（不手写 SVG） */
-    icon?: string
+    /** 图标组件（tdesign-icons-vue-next 直接引入，不手写 SVG） */
+    icon?: Component
     /** 状态胶囊文案；不传则不显示胶囊 */
     pillText?: string
     pillTheme?: 'default' | 'primary' | 'warning' | 'danger' | 'success'
@@ -55,7 +58,7 @@ withDefaults(
     footer?: string
     valueSize?: number
   }>(),
-  { icon: '', pillText: '', pillTheme: 'default', hint: '', footer: '', valueSize: 26 }
+  { pillText: '', pillTheme: 'default', hint: '', footer: '', valueSize: 26 }
 )
 </script>
 

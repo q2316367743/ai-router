@@ -4,6 +4,8 @@
  * 把「哪个指标配哪个图标、胶囊怎么写、卡内迷你图画什么」从模板里抽出来。
  * 阈值与档位判定仍全部来自 useUsageStats（本文件不重复定义任何阈值，只做文案与图元选择）。
  */
+import type { Component } from 'vue'
+import { ChartBarIcon, CheckCircleIcon, LayersIcon, TimeIcon } from 'tdesign-icons-vue-next'
 import {
   REQUEST_MAGNITUDE_THRESHOLDS,
   TOKEN_MAGNITUDE_THRESHOLDS,
@@ -29,8 +31,8 @@ type CardViz = { kind: 'bars'; values: number[] } | { kind: 'progress'; percent:
 export interface UsageCardConfig {
   key: string
   label: string
-  /** tdesign 图标名（不手写 SVG） */
-  icon: string
+  /** 图标组件（tdesign-icons-vue-next 直接引入，不手写 SVG） */
+  icon: Component
   value: number
   unit: string
   /** 显式给出小数位，避免依赖 t-statistic 的默认格式 */
@@ -92,7 +94,7 @@ export function buildStatCardConfig(stats: UseUsageStatsResult, key: StatCardKey
       return {
         key,
         label: '请求数',
-        icon: 'chart-bar',
+        icon: ChartBarIcon,
         value: totals.requestCount,
         unit: '次',
         decimalPlaces: 0,
@@ -109,7 +111,7 @@ export function buildStatCardConfig(stats: UseUsageStatsResult, key: StatCardKey
       return {
         key,
         label: '成功率',
-        icon: 'check-circle',
+        icon: CheckCircleIcon,
         value: rate ?? 0,
         unit: '%',
         decimalPlaces: 1,
@@ -127,7 +129,7 @@ export function buildStatCardConfig(stats: UseUsageStatsResult, key: StatCardKey
       return {
         key,
         label: '平均延迟',
-        icon: 'time',
+        icon: TimeIcon,
         value: latencyMs === null ? 0 : latencyMs / 1000,
         unit: 's',
         decimalPlaces: 2,
@@ -148,7 +150,7 @@ export function buildStatCardConfig(stats: UseUsageStatsResult, key: StatCardKey
       return {
         key,
         label: '总 Tokens',
-        icon: 'layers',
+        icon: LayersIcon,
         value: token.value,
         unit: token.unit,
         decimalPlaces: decimalsOf(token.value),

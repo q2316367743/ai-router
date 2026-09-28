@@ -7,7 +7,7 @@
     <template v-else>
       <div ref="listRef" class="quota-list">
         <div v-for="row in rows" :key="row.providerId" class="quota-row">
-          <t-icon name="drag-move" class="drag-handle" />
+          <drag-move-icon class="drag-handle" />
           <div class="quota-main">
             <span class="quota-name" :class="{ 'is-hidden': !row.visible }">{{ row.name }}</span>
             <t-tag v-if="row.strategyLabel" variant="outline" size="small">
@@ -51,6 +51,7 @@
  * 行数据以 providerId 为键：提供商名可改、可重名，不能当键（改名后这里展示新名字、顺序不乱）。
  */
 import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { DragMoveIcon } from 'tdesign-icons-vue-next'
 import Sortable from 'sortablejs'
 import type { ProviderQuotaInfo, TrayQuotaConfig } from '@common/types'
 import { DEFAULT_BALANCE_ALERT_THRESHOLD } from '@common/types'

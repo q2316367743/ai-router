@@ -14,7 +14,7 @@
         @change="onMenuChange"
       >
         <t-menu-item v-for="item in menus" :key="item.value" :value="item.value">
-          <template #icon><t-icon :name="item.icon" /></template>
+          <template #icon><component :is="item.icon" /></template>
           {{ item.label }}
         </t-menu-item>
       </t-menu>
@@ -24,9 +24,9 @@
     <t-content class="main-container">
       <!-- 只缓存概览页：它是唯一「进页就重建整套图表」的重页面，缓存后切回来不复用空态、直接显示上次数据；
            日志页的推送订阅与轮询依赖卸载收尾，不缓存 -->
-      <router-view v-slot="{ Component }">
+      <router-view v-slot="{ Component: comp }">
         <keep-alive :include="['HomePage']">
-          <component :is="Component" />
+          <component :is="comp" />
         </keep-alive>
       </router-view>
     </t-content>
@@ -34,14 +34,25 @@
     <!-- 折叠按钮：悬浮于标题区左侧（macOS 让出交通灯），穿透拖拽层 -->
     <div class="common-operator" :style="{ left: `${l1}px` }">
       <t-button theme="default" shape="square" variant="text" @click="toggleCollapsed()">
-        <template #icon><t-icon name="view-list" /></template>
+        <template #icon><view-list-icon /></template>
       </t-button>
     </div>
   </t-layout>
 </template>
 
 <script lang="ts" setup>
-import { computed } from 'vue'
+import { computed, type Component } from 'vue'
+import {
+  ChartBarIcon,
+  CloudIcon,
+  DashboardIcon,
+  DataBaseIcon,
+  HistoryIcon,
+  LinkIcon,
+  ServerIcon,
+  SettingIcon,
+  ViewListIcon
+} from 'tdesign-icons-vue-next'
 import { useRoute, useRouter } from 'vue-router'
 import { collapsed, toggleCollapsed } from '@/global/collapsed'
 import { useColorMode } from '@/hooks/colorMode'
@@ -50,18 +61,18 @@ import { useTitlePadding } from '@/hooks/useTitlePadding'
 interface MenuItem {
   value: string
   label: string
-  icon: string
+  icon: Component
 }
 
 const menus: MenuItem[] = [
-  { value: '/home', label: '概览', icon: 'dashboard' },
-  { value: '/providers', label: '提供商', icon: 'cloud' },
-  { value: '/models', label: '模型映射', icon: 'link' },
-  { value: '/service', label: '服务', icon: 'server' },
-  { value: '/logs', label: '日志', icon: 'history' },
-  { value: '/usage', label: '用量统计', icon: 'chart-bar' },
-  { value: '/quota', label: '余量', icon: 'data-base' },
-  { value: '/settings', label: '设置', icon: 'setting' }
+  { value: '/home', label: '概览', icon: DashboardIcon },
+  { value: '/providers', label: '提供商', icon: CloudIcon },
+  { value: '/models', label: '模型映射', icon: LinkIcon },
+  { value: '/service', label: '服务', icon: ServerIcon },
+  { value: '/logs', label: '日志', icon: HistoryIcon },
+  { value: '/usage', label: '用量统计', icon: ChartBarIcon },
+  { value: '/quota', label: '余量', icon: DataBaseIcon },
+  { value: '/settings', label: '设置', icon: SettingIcon }
 ]
 
 const route = useRoute()

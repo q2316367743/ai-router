@@ -24,7 +24,7 @@
               <t-input :value="endpoint" readonly class="flex-1 font-mono" />
               <t-tooltip content="复制 Base URL">
                 <t-button variant="outline" shape="square" @click="onCopy(endpoint)">
-                  <template #icon><t-icon name="file-copy" /></template>
+                  <template #icon><file-copy-icon /></template>
                 </t-button>
               </t-tooltip>
             </div>
@@ -41,12 +41,14 @@
               <t-input :value="displayKey" readonly class="flex-1 font-mono" />
               <t-tooltip :content="showKey ? '隐藏' : '显示'">
                 <t-button variant="outline" shape="square" @click="showKey = !showKey">
-                  <template #icon><t-icon :name="showKey ? 'browse' : 'browse-off'" /></template>
+                  <template #icon>
+                    <component :is="showKey ? BrowseIcon : BrowseOffIcon" />
+                  </template>
                 </t-button>
               </t-tooltip>
               <t-tooltip content="复制">
                 <t-button variant="outline" shape="square" @click="onCopy(config.apiKey)">
-                  <template #icon><t-icon name="file-copy" /></template>
+                  <template #icon><file-copy-icon /></template>
                 </t-button>
               </t-tooltip>
               <t-popconfirm content="重新生成后旧 Key 立即失效，确定？" @confirm="regenerate">
@@ -89,6 +91,7 @@
 </template>
 
 <script lang="ts" setup>
+import { BrowseIcon, BrowseOffIcon, FileCopyIcon } from 'tdesign-icons-vue-next'
 import type { ServiceConfig, ServiceStatus } from '@common/types'
 import { maskKey } from '@/utils/format'
 import { copyText } from '@/utils/clipboard'

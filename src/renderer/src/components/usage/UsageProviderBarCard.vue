@@ -2,7 +2,7 @@
   <UsageChartCard
     v-if="option"
     title="供应商 Tokens"
-    icon="chart-bar"
+    :icon="ChartBarIcon"
     :option="option"
     :height="height"
   />
@@ -13,6 +13,7 @@
  * 供应商 Tokens 条形图卡：取 token 前 6 名，其余合并为「其他」；无数据时整卡不渲染。
  */
 import { computed } from 'vue'
+import { ChartBarIcon } from 'tdesign-icons-vue-next'
 import type { DashboardCardContext } from './cardTypes'
 import UsageChartCard from './UsageChartCard.vue'
 import { buildTopBarOption } from '@/components/EChart/options'

@@ -37,7 +37,8 @@
  *   让「某一个窗口告急 / 余额见底」时整卡一眼可辨；
  * - 只有余额、没有可比比例的策略（DeepSeek 等）退化为大数值卡；完整明细仍在主窗口「余量」页。
  */
-import { computed } from 'vue'
+import { computed, type Component } from 'vue'
+import { ChartRingIcon, WalletIcon } from 'tdesign-icons-vue-next'
 import type { ProviderQuotaInfo, QuotaRateWindow } from '@common/types'
 import {
   balanceSeverity,
@@ -67,8 +68,8 @@ interface QuotaCardValue {
 }
 
 interface QuotaCardModel {
-  /** tdesign 图标名（不手写 SVG） */
-  icon: string
+  /** 图标组件（tdesign-icons-vue-next 直接引入，不手写 SVG） */
+  icon: Component
   pill: { text: string; theme: PillTheme } | null
   /** 分档类：决定卡片右上角渐晕，空串表示不分档 */
   levelClass: string
@@ -136,7 +137,7 @@ const model = computed<QuotaCardModel>(() => {
 
   if (!snap) {
     return {
-      icon: 'wallet',
+      icon: WalletIcon,
       pill: item.error ? { text: '查询失败', theme: 'danger' } : null,
       levelClass: item.error ? 'stat-poor' : '',
       windows: [],
@@ -154,7 +155,7 @@ const model = computed<QuotaCardModel>(() => {
     const balanceText =
       cost?.balance != null ? `余额 ${currencyPrefix(cost.currency)}${cost.balance}` : ''
     return {
-      icon: 'chart-ring',
+      icon: ChartRingIcon,
       pill: null,
       levelClass: critical ? `stat-${quotaWindowSeverity(critical.win.usedPercent)}` : '',
       windows,
@@ -174,7 +175,7 @@ const model = computed<QuotaCardModel>(() => {
       win: { usedPercent: costPercent, resetsAt: cost.resetsAt ?? null }
     }
     return {
-      icon: 'chart-ring',
+      icon: ChartRingIcon,
       pill: null,
       levelClass: `stat-${quotaWindowSeverity(costPercent)}`,
       windows: [row],
@@ -189,7 +190,7 @@ const model = computed<QuotaCardModel>(() => {
   // 纯余额型（DeepSeek 等）：没有上限可比，呈现为大数值 + 阈值分档
   if (cost?.balance != null) {
     return {
-      icon: 'wallet',
+      icon: WalletIcon,
       pill: { text: '余额', theme: 'default' },
       levelClass: `stat-${balanceSeverity(cost.balance, props.threshold)}`,
       windows: [],
@@ -210,7 +211,7 @@ const model = computed<QuotaCardModel>(() => {
     .map((row) => `${row.label} ${row.value}`)
     .join(' · ')
   return {
-    icon: 'wallet',
+    icon: WalletIcon,
     pill: null,
     levelClass: '',
     windows: [],

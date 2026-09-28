@@ -16,7 +16,7 @@
           <t-radio-button value="chain">链路</t-radio-button>
         </t-radio-group>
         <t-button :disabled="!hasProvider" @click="openCreate">
-          <template #icon><t-icon name="add" /></template>
+          <template #icon><add-icon /></template>
           新增对外模型
         </t-button>
       </div>
@@ -41,7 +41,7 @@
           <div class="flex items-center gap-4px">
             <span class="font-500">{{ row.publicName }}</span>
             <t-button variant="text" shape="square" size="small" @click="copyName(row.publicName)">
-              <template #icon><t-icon name="file-copy" /></template>
+              <template #icon><file-copy-icon /></template>
             </t-button>
           </div>
         </template>
@@ -100,6 +100,7 @@
 </template>
 
 <script lang="ts" setup>
+import { AddIcon, FileCopyIcon } from 'tdesign-icons-vue-next'
 import type { ModelMappingInfo } from '@common/types'
 import PageLayout from '@/components/PageLayout/PageLayout.vue'
 import ChannelTable from './components/ChannelTable.vue'

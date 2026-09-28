@@ -11,7 +11,7 @@
         :loading="refreshing"
         @click="refresh"
       >
-        <template #icon><t-icon name="refresh" /></template>
+        <template #icon><refresh-icon /></template>
       </t-button>
     </div>
 
@@ -40,6 +40,7 @@
  * - 停用的提供商不参与余量查询（快照会变陈），一律不展示。
  */
 import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { RefreshIcon } from 'tdesign-icons-vue-next'
 import type { ProviderQuotaInfo } from '@common/types'
 import {
   resolveTrayQuotaItems,

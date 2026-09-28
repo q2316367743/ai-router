@@ -2,7 +2,7 @@
   <UsageChartCard
     v-if="option"
     title="Agent 与提供商流向（近七天）"
-    icon="flowchart"
+    :icon="FlowchartIcon"
     :hint="SANKEY_HINT"
     :option="option"
     :height="height"
@@ -18,6 +18,7 @@
  * 节拍上（见 pages/home/index.vue），本组件只负责展示。无连线时整卡不渲染。
  */
 import { computed } from 'vue'
+import { FlowchartIcon } from 'tdesign-icons-vue-next'
 import type { DashboardCardContext } from './cardTypes'
 import UsageChartCard from './UsageChartCard.vue'
 import { buildAgentProviderSankeyOption } from '@/components/EChart/optionsFlow'

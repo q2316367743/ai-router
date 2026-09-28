@@ -1,5 +1,5 @@
 <template>
-  <UsageChartCard title="请求与用量趋势" icon="chart-combo" :option="option" :height="height" />
+  <UsageChartCard title="请求与用量趋势" :icon="ChartComboIcon" :option="option" :height="height" />
 </template>
 
 <script lang="ts" setup>
@@ -8,6 +8,7 @@
  * 自给自足卡片：从 ctx 取数并构建图表 option，随看板维度与筛选联动。
  */
 import { computed } from 'vue'
+import { ChartComboIcon } from 'tdesign-icons-vue-next'
 import type { DashboardCardContext } from './cardTypes'
 import UsageChartCard from './UsageChartCard.vue'
 import { buildRequestTokenOption } from '@/components/EChart/options'

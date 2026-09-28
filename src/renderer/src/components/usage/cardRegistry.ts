@@ -7,6 +7,18 @@
  * surfaces 控制卡片出现在哪些界面（速度 / 来源 Agent 两卡数据仅首页取数，且窄面板放不下）；
  * id 是布局配置的持久化键，注册后不可改名（改名等于换卡，用户的配置会失效）。
  */
+import {
+  CalendarIcon,
+  ChartBarIcon,
+  ChartComboIcon,
+  ChartLineIcon,
+  ChartPieIcon,
+  ChartRingIcon,
+  CheckCircleIcon,
+  FlowchartIcon,
+  LayersIcon,
+  TimeIcon
+} from 'tdesign-icons-vue-next'
 import type { DashboardCardDef } from './cardTypes'
 import UsageStatCard from './UsageStatCard.vue'
 import UsageTrendCard from './UsageTrendCard.vue'
@@ -26,7 +38,7 @@ export const DASHBOARD_CARDS: DashboardCardDef[] = [
   {
     id: 'stat-requests',
     title: '请求数',
-    icon: 'chart-bar',
+    icon: ChartBarIcon,
     component: UsageStatCard,
     surfaces: [...BOTH_SURFACES],
     defaultVisible: true,
@@ -36,7 +48,7 @@ export const DASHBOARD_CARDS: DashboardCardDef[] = [
   {
     id: 'stat-success',
     title: '成功率',
-    icon: 'check-circle',
+    icon: CheckCircleIcon,
     component: UsageStatCard,
     surfaces: [...BOTH_SURFACES],
     defaultVisible: true,
@@ -46,7 +58,7 @@ export const DASHBOARD_CARDS: DashboardCardDef[] = [
   {
     id: 'stat-latency',
     title: '平均延迟',
-    icon: 'time',
+    icon: TimeIcon,
     component: UsageStatCard,
     surfaces: [...BOTH_SURFACES],
     defaultVisible: true,
@@ -56,7 +68,7 @@ export const DASHBOARD_CARDS: DashboardCardDef[] = [
   {
     id: 'stat-tokens',
     title: '总 Tokens',
-    icon: 'layers',
+    icon: LayersIcon,
     component: UsageStatCard,
     surfaces: [...BOTH_SURFACES],
     defaultVisible: true,
@@ -66,7 +78,7 @@ export const DASHBOARD_CARDS: DashboardCardDef[] = [
   {
     id: 'trend',
     title: '请求与用量趋势',
-    icon: 'chart-combo',
+    icon: ChartComboIcon,
     component: UsageTrendCard,
     surfaces: [...BOTH_SURFACES],
     defaultVisible: true,
@@ -75,7 +87,7 @@ export const DASHBOARD_CARDS: DashboardCardDef[] = [
   {
     id: 'provider-trend',
     title: '供应商 Tokens 趋势',
-    icon: 'chart-line',
+    icon: ChartLineIcon,
     component: UsageProviderTrendCard,
     surfaces: [...BOTH_SURFACES],
     defaultVisible: true,
@@ -84,7 +96,7 @@ export const DASHBOARD_CARDS: DashboardCardDef[] = [
   {
     id: 'activity',
     title: '活跃度',
-    icon: 'calendar',
+    icon: CalendarIcon,
     component: UsageActivityCard,
     surfaces: [...BOTH_SURFACES],
     defaultVisible: true,
@@ -93,7 +105,7 @@ export const DASHBOARD_CARDS: DashboardCardDef[] = [
   {
     id: 'composition',
     title: '令牌构成',
-    icon: 'chart-pie',
+    icon: ChartPieIcon,
     component: UsageCompositionCard,
     surfaces: [...BOTH_SURFACES],
     defaultVisible: true,
@@ -102,7 +114,7 @@ export const DASHBOARD_CARDS: DashboardCardDef[] = [
   {
     id: 'ratio-success',
     title: '成功率环形',
-    icon: 'chart-ring',
+    icon: ChartRingIcon,
     component: UsageSuccessRatioCard,
     surfaces: [...BOTH_SURFACES],
     defaultVisible: true,
@@ -111,7 +123,7 @@ export const DASHBOARD_CARDS: DashboardCardDef[] = [
   {
     id: 'ratio-cache',
     title: '缓存占比环形',
-    icon: 'chart-ring',
+    icon: ChartRingIcon,
     component: UsageCacheRatioCard,
     surfaces: [...BOTH_SURFACES],
     defaultVisible: true,
@@ -120,7 +132,7 @@ export const DASHBOARD_CARDS: DashboardCardDef[] = [
   {
     id: 'provider-bar',
     title: '供应商 Tokens',
-    icon: 'chart-bar',
+    icon: ChartBarIcon,
     component: UsageProviderBarCard,
     surfaces: [...BOTH_SURFACES],
     defaultVisible: true,
@@ -129,7 +141,7 @@ export const DASHBOARD_CARDS: DashboardCardDef[] = [
   {
     id: 'clients',
     title: '来源 Agent 请求数（近七天）',
-    icon: 'chart-bar',
+    icon: ChartBarIcon,
     component: UsageClientCard,
     surfaces: ['home'],
     defaultVisible: true,
@@ -138,7 +150,7 @@ export const DASHBOARD_CARDS: DashboardCardDef[] = [
   {
     id: 'agent-provider-flow',
     title: 'Agent 与提供商流向（近七天）',
-    icon: 'flowchart',
+    icon: FlowchartIcon,
     component: UsageSankeyCard,
     surfaces: ['home'],
     defaultVisible: true,
@@ -147,7 +159,7 @@ export const DASHBOARD_CARDS: DashboardCardDef[] = [
   {
     id: 'speed',
     title: '模型速度趋势（近七天）',
-    icon: 'time',
+    icon: TimeIcon,
     component: UsageSpeedCard,
     surfaces: ['home'],
     defaultVisible: true,

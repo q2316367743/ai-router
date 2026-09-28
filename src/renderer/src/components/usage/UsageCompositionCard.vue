@@ -1,5 +1,5 @@
 <template>
-  <MetricCard label="令牌构成" icon="chart-pie" :footer="FOOTER_NOTE">
+  <MetricCard label="令牌构成" :icon="ChartPieIcon" :footer="FOOTER_NOTE">
     <template #viz>
       <div v-if="segments.length === 0" class="text-12px text-td-placeholder py-8px">
         所选区间内暂无用量
@@ -35,6 +35,7 @@
  * 四段各有语义色，因此本卡不用分档色，也不给状态胶囊（构成没有好坏）。
  */
 import { computed } from 'vue'
+import { ChartPieIcon } from 'tdesign-icons-vue-next'
 import type { DashboardCardContext } from './cardTypes'
 import type { CompositionSegment } from './useUsageStats'
 import MetricCard from './MetricCard.vue'

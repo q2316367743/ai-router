@@ -14,7 +14,7 @@
           title="刷新该提供商"
           @click="emit('refresh', item.providerId)"
         >
-          <template #icon><t-icon name="refresh" /></template>
+          <template #icon><refresh-icon /></template>
         </t-button>
       </div>
       <div class="quota-card__meta">
@@ -61,6 +61,7 @@
 </template>
 
 <script lang="ts" setup>
+import { RefreshIcon } from 'tdesign-icons-vue-next'
 import type { ProviderQuotaInfo, QuotaCostSnapshot, QuotaRateWindow } from '@common/types'
 import { windowTitleOf, currencyPrefix } from '@common/utils/quotaDisplay'
 import QuotaWindowRow from '@/components/quota/QuotaWindowRow.vue'

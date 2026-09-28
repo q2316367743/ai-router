@@ -24,7 +24,7 @@
         <code class="text-13px">{{ current.baseUrl }}</code>
         <t-tooltip content="复制 Base URL">
           <t-button variant="text" shape="square" size="small" @click="onCopy(current.baseUrl)">
-            <template #icon><t-icon name="file-copy" /></template>
+            <template #icon><file-copy-icon /></template>
           </t-button>
         </t-tooltip>
         <span class="text-12px text-td-placeholder">{{ current.baseUrlNote }}</span>
@@ -34,7 +34,7 @@
         <div class="flex items-center justify-between mb-6px">
           <span class="text-13px font-500">{{ snippet.label }}</span>
           <t-button variant="text" size="small" theme="primary" @click="onCopy(snippet.code)">
-            <template #icon><t-icon name="file-copy" /></template>
+            <template #icon><file-copy-icon /></template>
             复制
           </t-button>
         </div>
@@ -46,6 +46,7 @@
 </template>
 
 <script lang="ts" setup>
+import { FileCopyIcon } from 'tdesign-icons-vue-next'
 import { copyText } from '@/utils/clipboard'
 
 interface Snippet {

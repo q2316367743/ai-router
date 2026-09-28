@@ -1,5 +1,5 @@
 <template>
-  <MetricCard label="缓存占比" icon="chart-ring" :footer="footer">
+  <MetricCard label="缓存占比" :icon="ChartRingIcon" :footer="footer">
     <template #viz>
       <EChart :option="option" :height="140" />
     </template>
@@ -12,6 +12,7 @@
  * 缓存占比没有好坏阈值，因此不给胶囊、不挂分档色。
  */
 import { computed } from 'vue'
+import { ChartRingIcon } from 'tdesign-icons-vue-next'
 import type { DashboardCardContext } from './cardTypes'
 import EChart from '@/components/EChart/EChart.vue'
 import { buildRatioDonutOption } from '@/components/EChart/options'

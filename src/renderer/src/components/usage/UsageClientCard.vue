@@ -2,7 +2,7 @@
   <UsageChartCard
     v-if="option"
     title="来源 Agent 请求数（近七天）"
-    icon="chart-bar"
+    :icon="ChartBarIcon"
     :hint="CLIENT_HINT"
     :option="option"
     :height="height"
@@ -18,6 +18,7 @@
  * （见 pages/home/index.vue），本组件只负责展示。
  */
 import { computed } from 'vue'
+import { ChartBarIcon } from 'tdesign-icons-vue-next'
 import type { DashboardCardContext } from './cardTypes'
 import UsageChartCard from './UsageChartCard.vue'
 import { buildTopBarOption } from '@/components/EChart/options'

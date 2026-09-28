@@ -2,7 +2,7 @@
   <UsageChartCard
     v-if="option"
     title="模型速度趋势（近七天）"
-    icon="time"
+    :icon="TimeIcon"
     :hint="SPEED_HINT"
     :option="option"
   />
@@ -16,6 +16,7 @@
  * 故取数由页面统一挂在刷新节拍上（见 pages/home/index.vue），本组件只负责展示。
  */
 import { computed } from 'vue'
+import { TimeIcon } from 'tdesign-icons-vue-next'
 import type { DashboardCardContext } from './cardTypes'
 import UsageChartCard from './UsageChartCard.vue'
 import { buildModelSpeedOption } from '@/components/EChart/options'

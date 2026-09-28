@@ -5,7 +5,7 @@
         >自动刷新</t-checkbox
       >
       <t-button variant="outline" size="small" :loading="loading" @click="() => refresh()">
-        <template #icon><t-icon name="refresh" /></template>
+        <template #icon><refresh-icon /></template>
         刷新
       </t-button>
       <t-popconfirm content="确定清空全部日志（保留窗口内 7 天）？" @confirm="clearAll">
@@ -124,6 +124,7 @@
 </template>
 
 <script lang="ts" setup>
+import { RefreshIcon } from 'tdesign-icons-vue-next'
 import type { PageInfo } from 'tdesign-vue-next'
 import type { LogStatusFilter, RequestLogItem } from '@common/types'
 import {

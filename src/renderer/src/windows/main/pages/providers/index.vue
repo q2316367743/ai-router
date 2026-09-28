@@ -7,7 +7,7 @@
           <t-switch v-model="showArchived" size="small" />
         </div>
         <t-button @click="openCreate">
-          <template #icon><t-icon name="add" /></template>
+          <template #icon><add-icon /></template>
           新增提供商
         </t-button>
       </div>
@@ -71,6 +71,7 @@
 </template>
 
 <script lang="ts" setup>
+import { AddIcon } from 'tdesign-icons-vue-next'
 import type { ProviderInfo, ProviderProtocol } from '@common/types'
 import { maskKey } from '@/utils/format'
 import PageLayout from '@/components/PageLayout/PageLayout.vue'

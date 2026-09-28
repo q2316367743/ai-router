@@ -12,6 +12,7 @@
 | RL‑06 | 文档同步：功能实现后，必须将技术文档写入或更新 `docs/` 目录，供后续 AI 参考    |
 | RL-07 | 不需要 build，只需要 typecheck，禁止做任何验证/测试，如需验证/测试，请让我来做 |
 | RL-08 | 未经我的允许，禁止读取 node_modules 目录下文件                                 |
+| RL-09 | 图标：禁止直接使用 `t-icon`，必须从 `tdesign-icons-vue-next` 引入图标组件      |
 
 ---
 
@@ -55,6 +56,12 @@
 
 - 统一使用 `tdesign` 组件库及图标，关于组件用法，使用 `tdesign-mcp-server` 这个 mcp 查看
 - 禁止手写 SVG，除非 `tdesign` 未提供对应图标
+- 图标一律 **从 `tdesign-icons-vue-next` 直接引入图标组件**（`import { AddIcon } from 'tdesign-icons-vue-next'` →
+  `<add-icon />`）
+- 禁止直接使用 `t-icon`（含 `<t-icon name="add" />` 这类运行时名字写法，见 RL-09）；图标名需先在 `tdesign-mcp-server` 的
+  `search-icon` 中确认存在
+- 需要动态图标（菜单表、卡片注册表等数据驱动场景）时传 **组件本身**：`icon: Component` + `<component :is="icon" />`
+  ，不得传图标名字符串
 
 2. **设计风格**
 
@@ -99,17 +106,21 @@
 
 2. **跨进程调用链路**
 
-- 渲染层不直接触达 Node / SQLite：`preload/src/modules/<域>/` 定义桥（`ipcRenderer.invoke('<域>:<动作>')`）→ `preload/index.ts` 组装 → 契约类型同步写进 `src/renderer/src/vite-env.d.ts` 的 `Window.preload` → main 侧同域 `dbIpc.ts` / `registerIpc.ts` 落地 handler
+- 渲染层不直接触达 Node / SQLite：`preload/src/modules/<域>/` 定义桥（`ipcRenderer.invoke('<域>:<动作>')`）→
+  `preload/index.ts` 组装 → 契约类型同步写进 `src/renderer/src/vite-env.d.ts` 的 `Window.preload` → main 侧同域
+  `dbIpc.ts` / `registerIpc.ts` 落地 handler
 - main 侧各域 IPC 统一在 `src/main/src/registerIpc.ts` 注册
 
 3. **数据库**
 
-- 表结构定义在 `src/main/src/db/schema/`，在 `schema/index.ts` re-export 后运行 `npx drizzle-kit generate` 生成迁移（输出 `resources/drizzle/`，随包 asarUnpack）
+- 表结构定义在 `src/main/src/db/schema/`，在 `schema/index.ts` re-export 后运行 `npx drizzle-kit generate` 生成迁移（输出
+  `resources/drizzle/`，随包 asarUnpack）
 - 查询按域拆 repo（`db/repo/<域>Repo.ts`），IPC 层只做参数校验与转发
 
 4. **新窗口**
 
-- 渲染层入口：`src/renderer/index.html` 指向的窗口入口在 `src/renderer/src/windows/<窗口名>/`（自带 main.ts / App.vue / router）；如需独立 preload 再扩展 `electron.vite.config.ts` 的多入口
+- 渲染层入口：`src/renderer/index.html` 指向的窗口入口在 `src/renderer/src/windows/<窗口名>/`（自带 main.ts / App.vue /
+  router）；如需独立 preload 再扩展 `electron.vite.config.ts` 的多入口
 
 ---
 
@@ -142,17 +153,19 @@ src/
 
 ### ❌ 错误示例与原因
 
-| 错误示例                                  | 原因                                                        |
-|-------------------------------------------|-------------------------------------------------------------|
-| `src/renderer/src/UserList.vue`           | 业务代码不应散落在 renderer/src 根部，页面进 windows/<窗口>/pages/ |
-| `pages/dashboard/api.ts`                  | 请求桥必须集中在 `preload/src/modules/`，页面不得直连 ipcRenderer |
-| `components/OrderDetailModal.vue`         | 违反组件存放规则，非通用组件不应放在 `src/components/`      |
-| 渲染层直接 `require('better-sqlite3')`    | 渲染层不碰 Node，必须走 `window.preload` 桥                 |
-| 使用 `<select>` 或 `alert()`              | 违反 RL-05，必须使用 `tdesign`                              |
-| 手写 SVG 图标                             | 违反 UI 约定，应使用 `tdesign` 图标                         |
-| `const data: any = res.data`              | 违反 RL-04，禁止 `any`                                      |
-| `color: #1677ff;`                         | 违反样式约定，应使用 tdesign CSS Token                      |
-| `FilterModal.vue` 作为弹窗                | 违反约定，弹窗外壳必须用 `.tsx`（`DialogPlugin` 命令式）    |
-| 弹窗内容直接写在 `.tsx` 内                | 违反约定，弹窗内容必须用 `.vue` 组件（`XxxContent.vue`）    |
-| `<t-dialog :visible>` + `v-if` 声明式弹窗 | 违反约定，应使用 `DialogPlugin` / `DrawerPlugin` 命令式 API |
-| 单文件超过 300 行未拆分                   | 违反 RL-06                                                  |
+| 错误示例                                  | 原因                                                                       |
+|-------------------------------------------|----------------------------------------------------------------------------|
+| `src/renderer/src/UserList.vue`           | 业务代码不应散落在 renderer/src 根部，页面进 windows/<窗口>/pages/         |
+| `pages/dashboard/api.ts`                  | 请求桥必须集中在 `preload/src/modules/`，页面不得直连 ipcRenderer          |
+| `components/OrderDetailModal.vue`         | 违反组件存放规则，非通用组件不应放在 `src/components/`                     |
+| 渲染层直接 `require('better-sqlite3')`    | 渲染层不碰 Node，必须走 `window.preload` 桥                                |
+| 使用 `<select>` 或 `alert()`              | 违反 RL-05，必须使用 `tdesign`                                             |
+| 手写 SVG 图标                             | 违反 UI 约定，应使用 `tdesign` 图标                                        |
+| `<t-icon name="add" />`                   | 违反 RL-09，必须从 `tdesign-icons-vue-next` 引入图标组件（`<add-icon />`） |
+| `icon: 'chart-bar'`（图标名字符串）       | 违反 RL-09，数据驱动的动态图标必须传组件（`icon: Component`）              |
+| `const data: any = res.data`              | 违反 RL-04，禁止 `any`                                                     |
+| `color: #1677ff;`                         | 违反样式约定，应使用 tdesign CSS Token                                     |
+| `FilterModal.vue` 作为弹窗                | 违反约定，弹窗外壳必须用 `.tsx`（`DialogPlugin` 命令式）                   |
+| 弹窗内容直接写在 `.tsx` 内                | 违反约定，弹窗内容必须用 `.vue` 组件（`XxxContent.vue`）                   |
+| `<t-dialog :visible>` + `v-if` 声明式弹窗 | 违反约定，应使用 `DialogPlugin` / `DrawerPlugin` 命令式 API                |
+| 单文件超过 300 行未拆分                   | 违反 RL-06                                                                 |

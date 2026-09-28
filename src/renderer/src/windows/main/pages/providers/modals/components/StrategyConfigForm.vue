@@ -23,8 +23,8 @@
       :placeholder="item.placeholder"
     >
       <template v-if="isSecure(item)" #suffix-icon>
-        <t-icon
-          :name="revealed[item.key] ? 'browse' : 'browse-off'"
+        <component
+          :is="revealed[item.key] ? BrowseIcon : BrowseOffIcon"
           class="cursor-pointer"
           @click="revealed[item.key] = !revealed[item.key]"
         />
@@ -37,6 +37,7 @@
 </template>
 
 <script lang="ts" setup>
+import { BrowseIcon, BrowseOffIcon } from 'tdesign-icons-vue-next'
 import type { QuotaStrategySetting } from '@common/types'
 
 const props = defineProps<{

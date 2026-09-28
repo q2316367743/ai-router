@@ -16,7 +16,7 @@
       </div>
       <template #help>
         <div v-if="currentPreset" class="flex items-center gap-4px text-12px text-td-secondary">
-          <t-icon name="check-circle" />
+          <check-circle-icon />
           {{
             presetUrl
               ? `请求地址 ${presetUrl}，只需填写 API Key`
@@ -47,15 +47,15 @@
             size="small"
             class="mr-[-24px]"
           >
-            <template #suffixIcon><t-icon name="jump" /></template>
+            <template #suffixIcon><jump-icon /></template>
             获取 API Key
           </t-link>
         </div>
       </template>
       <t-input v-model="form.apiKey" :type="showKey ? 'text' : 'password'" placeholder="sk-...">
         <template #suffix-icon>
-          <t-icon
-            :name="showKey ? 'browse' : 'browse-off'"
+          <component
+            :is="showKey ? BrowseIcon : BrowseOffIcon"
             class="cursor-pointer"
             @click="showKey = !showKey"
           />
@@ -112,6 +112,7 @@
 </template>
 
 <script lang="ts" setup>
+import { BrowseIcon, BrowseOffIcon, CheckCircleIcon, JumpIcon } from 'tdesign-icons-vue-next'
 import type { ProviderInfo, ProviderKind, ProviderProtocol, QuotaStrategyInfo } from '@common/types'
 import { parseQuotaConfig } from '@common/utils/quotaConfig'
 import { MessageUtil } from '@/utils/modal'

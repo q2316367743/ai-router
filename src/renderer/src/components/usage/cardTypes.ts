@@ -34,8 +34,8 @@ export interface DashboardCardDef {
   id: string
   /** 中文名：配置抽屉里展示 */
   title: string
-  /** tdesign 图标名（t-icon name，抽屉行内展示） */
-  icon: string
+  /** 图标组件（tdesign-icons-vue-next 直接引入，抽屉行内展示） */
+  icon: Component
   component: Component
   /** 出现在哪些界面（如速度/来源 Agent 仅首页） */
   surfaces: DashboardSurface[]

@@ -2,7 +2,7 @@
   <MetricCard
     :class="levelClass"
     label="成功率"
-    icon="chart-ring"
+    :icon="ChartRingIcon"
     :pill-text="pill?.text"
     :pill-theme="pill?.theme"
     :footer="footer"
@@ -19,6 +19,7 @@
  * 复用统计卡同一套胶囊文案与分档色（阈值来自 useUsageStats，不在此重复定义）。
  */
 import { computed } from 'vue'
+import { ChartRingIcon } from 'tdesign-icons-vue-next'
 import type { DashboardCardContext } from './cardTypes'
 import EChart from '@/components/EChart/EChart.vue'
 import { buildRatioDonutOption } from '@/components/EChart/options'

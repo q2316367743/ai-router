@@ -13,8 +13,8 @@
 
     <div ref="listRef" class="card-list">
       <div v-for="item in items" :key="item.id" class="card-row">
-        <t-icon name="drag-move" class="drag-handle" />
-        <t-icon :name="item.icon" class="card-icon" />
+        <drag-move-icon class="drag-handle" />
+        <component :is="item.icon" class="card-icon" />
         <span class="card-title" :class="{ 'is-hidden': !item.visible }">{{ item.title }}</span>
         <t-switch v-model="item.visible" size="small" @change="save" />
       </div>
@@ -33,7 +33,8 @@
  * 不存在未保存草稿，直接重读该界面的生效布局即可。拖拽用 sortablejs（handle 限定
  * 拖拽把手，onEnd 把 DOM 顺序同步回数组，配合 :key 使 Vue 补丁为空操作）。
  */
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch, type Component } from 'vue'
+import { DragMoveIcon } from 'tdesign-icons-vue-next'
 import Sortable from 'sortablejs'
 import type { DashboardSurface } from '@common/types'
 import type { DashboardCardDef } from '@/components/usage/cardTypes'
@@ -51,7 +52,7 @@ import { MessageUtil } from '@/utils/modal'
 interface LayoutRow {
   id: string
   title: string
-  icon: string
+  icon: Component
   visible: boolean
 }
 

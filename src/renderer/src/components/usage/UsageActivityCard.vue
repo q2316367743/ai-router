@@ -1,5 +1,5 @@
 <template>
-  <MetricCard label="活跃度" icon="calendar" :pill-text="windowLabel">
+  <MetricCard label="活跃度" :icon="CalendarIcon" :pill-text="windowLabel">
     <!-- 四项指标按参考图的多行明细排布：值在上、标签在下，2×2 网格 -->
     <div class="metric-grid">
       <div v-for="metric in metrics" :key="metric.label" class="metric-cell">
@@ -23,6 +23,7 @@
  * 热力图的五档色是「热度」语义，与好坏/量级分档无关，故本卡不给卡片挂 stat-* 类。
  */
 import { computed } from 'vue'
+import { CalendarIcon } from 'tdesign-icons-vue-next'
 import type { UsageActivity } from '@common/types'
 import type { DashboardCardContext } from './cardTypes'
 import MetricCard from './MetricCard.vue'

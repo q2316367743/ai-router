@@ -3,11 +3,11 @@
     <template #extra>
       <div class="flex items-center gap-8px">
         <t-button @click="openCatalog">
-          <template #icon><t-icon name="view-module" /></template>
+          <template #icon><view-module-icon /></template>
           策略目录
         </t-button>
         <t-button :loading="refreshingAll" @click="refreshAll">
-          <template #icon><t-icon name="refresh" /></template>
+          <template #icon><refresh-icon /></template>
           刷新全部
         </t-button>
       </div>
@@ -46,6 +46,7 @@
 </template>
 
 <script lang="ts" setup>
+import { RefreshIcon, ViewModuleIcon } from 'tdesign-icons-vue-next'
 import type { ProviderQuotaInfo } from '@common/types'
 import PageLayout from '@/components/PageLayout/PageLayout.vue'
 import { MessageUtil } from '@/utils/modal'

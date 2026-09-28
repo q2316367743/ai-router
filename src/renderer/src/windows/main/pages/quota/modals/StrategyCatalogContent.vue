@@ -6,7 +6,7 @@
       </span>
       <div class="flex items-center gap-8px">
         <t-button size="small" @click="openCreate">
-          <template #icon><t-icon name="add" /></template>
+          <template #icon><add-icon /></template>
           新建策略
         </t-button>
         <t-button size="small" variant="outline" @click="emit('close')">关闭</t-button>
@@ -51,6 +51,7 @@
 </template>
 
 <script lang="ts" setup>
+import { AddIcon } from 'tdesign-icons-vue-next'
 import type { QuotaPluginInfo, QuotaStrategyInfo } from '@common/types'
 import { MessageUtil } from '@/utils/modal'
 import { openPluginDrawer } from './PluginDrawer'
